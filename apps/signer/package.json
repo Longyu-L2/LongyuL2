@@ -1,0 +1,26 @@
+{
+  "name": "@longyu/signer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LONGYU signer: holds the publisher, relayer and faucet-signer keys on the private network and signs only what its policy allows",
+  "main": "src/server.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/policy.test.ts test/app.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@longyu/abis": "0.1.0",
+    "viem": "2.58.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

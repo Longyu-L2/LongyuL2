@@ -11,8 +11,8 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
-    "test": "node --import tsx --test test/html.test.ts test/format.test.ts test/indexer.test.ts test/pages.test.ts test/node-fallback.test.ts test/origin.test.ts",
-    "test:e2e": "node --import tsx --test test/e2e.test.ts",
+    "test": "node --no-wasm-code-gc --import tsx --test test/html.test.ts test/format.test.ts test/indexer.test.ts test/pages.test.ts test/node-fallback.test.ts test/origin.test.ts",
+    "test:e2e": "node --no-wasm-code-gc --import tsx --test test/e2e.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

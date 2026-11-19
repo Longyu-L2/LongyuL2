@@ -1,5 +1,7 @@
 version: 2
 updates:
+  # Minor and patch releases come as one weekly proposal. A major version is taken by hand, with
+  # the code changes it needs.
   - package-ecosystem: npm
     directory: /
     schedule:
@@ -8,14 +10,16 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+  # The app's versions are the set its Expo SDK release names, and move with the SDK. Security
+  # updates still arrive.
   - package-ecosystem: npm
     directory: /apps/mobile
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      minor-and-patch:
-        update-types: [minor, patch]
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule:

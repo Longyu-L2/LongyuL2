@@ -1,0 +1,14 @@
+{
+  "name": "longyu-brand-tools",
+  "private": true,
+  "type": "module",
+  "description": "Builds the LONGYU brand files (brand/) and copies them into the apps",
+  "scripts": {
+    "extract": "node extract.mjs",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "2.6.2",
+    "fontkit": "2.0.4"
+  }
+}

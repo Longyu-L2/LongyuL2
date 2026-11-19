@@ -1,0 +1,11 @@
+{
+  "name": "@longyu/abis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Typed ABIs and bytecode generated from contracts/out (run `npm run generate` after `forge build`)",
+  "main": "src/index.ts",
+  "scripts": {
+    "generate": "node scripts/generate.mjs"
+  }
+}

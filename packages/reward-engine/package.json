@@ -1,0 +1,23 @@
+{
+  "name": "@longyu/reward-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Deterministic daily mining settlement: weights, emission scaling, cumulative ledger and Merkle roots",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "node --import tsx --test test/engine.test.ts",
+    "typecheck": "tsc --noEmit",
+    "fixture": "tsx scripts/make-fixture.ts",
+    "e2e": "tsx scripts/e2e-anvil.ts"
+  },
+  "dependencies": {
+    "@openzeppelin/merkle-tree": "1.0.8",
+    "viem": "2.58.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

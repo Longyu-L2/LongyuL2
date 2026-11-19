@@ -1,0 +1,5 @@
+# Foundry output and the locally installed forge-std (see README.md)
+out/
+cache/
+broadcast/
+lib/

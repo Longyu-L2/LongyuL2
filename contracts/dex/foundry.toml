@@ -1,0 +1,44 @@
+# LONGYU Swap: a Uniswap V2 fork, built with the original compilers and settings.
+# Each file's exact pragma selects its compiler: 0.5.16 for src/core, 0.6.6 for src/periphery and
+# the WETH9 test mock, 0.8.28 for tests and scripts only.
+#
+# Determinism: the Pair creation code ends with a metadata hash that covers every source file's
+# content and path, the remappings and the settings below. The router's init code hash
+# (src/periphery/libraries/UniswapV2Library.sol) commits to that creation code, so change nothing
+# here, and no file under src/core, without updating the hash (test/InitCodeHash.t.sol fails if
+# they disagree).
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+auto_detect_solc = true
+optimizer = true
+optimizer_runs = 999999
+evm_version = "istanbul"
+auto_detect_remappings = false
+remappings = [
+  "@uniswap/v2-core/contracts/=src/core/",
+  "@uniswap/lib/contracts/libraries/=src/periphery/libraries/",
+  "forge-std/=lib/forge-std/src/",
+]
+# Filtered test runs read the WETH9 test artifact from out/ (see test/utils/DexFixture.sol).
+fs_permissions = [{ access = "read", path = "./out" }]
+
+[fuzz]
+runs = 2000
+
+[fmt]
+line_length = 110
+
+[invariant]
+runs = 256
+depth = 100
+# The handler guards every expected revert, so any other revert is a failure.
+fail_on_revert = true
+
+[lint]
+# src/ is Uniswap V2 kept verbatim, so its style findings are not acted on. Lint our own code with
+# `forge lint test script`.
+lint_on_build = false

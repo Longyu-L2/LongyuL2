@@ -1,0 +1,70 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.28;
+
+import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {EmissionSchedule} from "./EmissionSchedule.sol";
+import {IMiningDistributor} from "./interfaces/IMiningDistributor.sol";
+import {IMiningVault} from "./interfaces/IMiningVault.sol";
+import {AssetTransfer} from "./libraries/AssetTransfer.sol";
+
+/// @title MiningVault
+/// @notice Holds the mining pool and funds the distributor only as rewards become claimable.
+/// @dev The distributor's float is limited to "entitled but not yet claimed". The vault never
+///      releases more than the schedule's cumulative budget to date, even if the distributor
+///      reports a larger entitlement. Anyone may call `release`. There is no withdraw function.
+///      The admin (a timelock) can point the vault at a new distributor; that power is listed in
+///      the public admin inventory.
+contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
+    address public immutable asset;
+    EmissionSchedule public immutable schedule;
+
+    address public distributor;
+    uint256 public released;
+
+    event DistributorSet(address indexed previous, address indexed current);
+    event Released(address indexed distributor, uint256 amount, uint256 totalReleased);
+
+    error ZeroAddress();
+    error NativeNotAccepted();
+
+    constructor(address asset_, EmissionSchedule schedule_, address admin) {
+        if (address(schedule_) == address(0) || admin == address(0)) revert ZeroAddress();
+        asset = asset_;
+        schedule = schedule_;
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+    }
+
+    receive() external payable {
+        if (asset != address(0)) revert NativeNotAccepted();
+    }
+
+    function setDistributor(address distributor_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (distributor_ == address(0)) revert ZeroAddress();
+        emit DistributorSet(distributor, distributor_);
+        distributor = distributor_;
+    }
+
+    /// @notice Amount the vault would send to the distributor right now.
+    function releasable() public view returns (uint256) {
+        address d = distributor;
+        if (d == address(0) || !schedule.started()) return 0;
+        uint256 allowed = IMiningDistributor(d).activeTotalEntitled();
+        uint256 scheduled = schedule.cumulativeBudget(schedule.currentDay());
+        if (allowed > scheduled) allowed = scheduled;
+        if (allowed <= released) return 0;
+        uint256 amount = allowed - released;
+        uint256 balance = AssetTransfer.balanceOf(asset, address(this));
+        return amount > balance ? balance : amount;
+    }
+
+    /// @notice Sends the releasable amount to the distributor. Callable by anyone.
+    function release() external nonReentrant returns (uint256 amount) {
+        amount = releasable();
+        if (amount == 0) return 0;
+        released += amount;
+        address d = distributor;
+        emit Released(d, amount, released);
+        AssetTransfer.send(asset, d, amount);
+    }
+}

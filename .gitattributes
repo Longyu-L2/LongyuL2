@@ -1,0 +1,5 @@
+# Shell scripts run in Linux containers: always LF.
+*.sh text eol=lf
+* text=auto
+# Chain files are hashed (op-geth checks genesis.json): keep them byte-identical everywhere.
+chain/testnet/*.json text eol=lf

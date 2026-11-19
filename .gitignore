@@ -1,0 +1,38 @@
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+.env
+*.log
+apps/api/.env
+apps/api/.env.devnet
+apps/api/.devnet-db/
+apps/api/.devnet-data/
+apps/web/dist/
+apps/mobile/.expo/
+apps/mobile/dist/
+# The Android app offered for download: copied in for a deploy, never committed
+apps/mobile/site/downloads/*.apk
+# Contract libraries: installed by `forge install --no-git` (see .github/workflows/ci.yml)
+contracts/lib/
+# Generated or local
+ops/monitor/config/
+apps/api/data/
+apps/mobile/.env*.local
+*.tsbuildinfo
+coverage/
+.DS_Store
+# Large intermediate output of chain/testnet/deploy-rollup.sh (genesis.json already contains it)
+chain/testnet/l2-allocs.json
+# Keys, signing material and built apps never belong in the repository
+.env.*
+!.env.example
+!apps/mobile/.env.development
+*.jks
+*.keystore
+*.p12
+signing.properties
+*testnet-secrets*.json
+*.apk
+*.aab
+ops/monitor/deployment.json

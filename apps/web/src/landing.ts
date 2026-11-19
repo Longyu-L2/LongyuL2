@@ -11,6 +11,26 @@ const moved = () => top.classList.toggle("moved", window.scrollY > 8);
 window.addEventListener("scroll", moved, { passive: true });
 moved();
 
+// On a phone the bar's links open as a sheet under it. The button shows only once this script runs.
+const menuButton = $("menu-button");
+const setMenu = (open: boolean) => {
+  top.classList.toggle("open", open);
+  document.documentElement.classList.toggle("menu-open", open);
+  menuButton.setAttribute("aria-expanded", String(open));
+  menuButton.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+};
+menuButton.hidden = false;
+menuButton.addEventListener("click", () => setMenu(!top.classList.contains("open")));
+$("menu").addEventListener("click", (e) => {
+  if ((e.target as Element).closest("a")) setMenu(false);
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key !== "Escape" || !top.classList.contains("open")) return;
+  setMenu(false);
+  menuButton.focus();
+});
+window.matchMedia("(min-width: 981px)").addEventListener("change", (e) => e.matches && setMenu(false));
+
 document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((button) => {
   button.addEventListener("click", async () => {
     try {

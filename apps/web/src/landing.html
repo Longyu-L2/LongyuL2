@@ -52,8 +52,14 @@
       .top .wrap { display: flex; align-items: center; gap: 32px; height: 72px; }
       .brand img { height: 26px; width: auto; }
       .top nav { display: flex; gap: 28px; margin-left: auto; }
-      .top nav a { font-weight: 600; font-size: 15px; padding: 12px 0; }
-      .top nav a:hover { color: var(--blue); }
+      .top nav a:not(.button) { font-weight: 600; font-size: 15px; padding: 12px 0; }
+      .top nav a:not(.button):hover { color: var(--blue); }
+      .top nav .button, .toggle { display: none; }
+      .toggle { place-items: center; order: 2; width: 44px; height: 44px; margin-right: -10px; padding: 0; border: 0; border-radius: 12px; background: none; color: var(--ink); cursor: pointer; }
+      .toggle svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+      .toggle .cross, .top.open .toggle .bars { display: none; }
+      .top.open .toggle .cross { display: inline; }
+      html.menu-open { overflow: hidden; }
 
       .hero { position: relative; background: var(--sky); overflow: hidden; }
       .hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(rgba(11, 111, 219, 0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(11, 111, 219, 0.09) 1px, transparent 1px); background-size: 64px 64px; background-position: center top; -webkit-mask-image: radial-gradient(120% 90% at 78% 40%, #000 20%, transparent 78%); mask-image: radial-gradient(120% 90% at 78% 40%, #000 20%, transparent 78%); }
@@ -142,8 +148,13 @@
         .net dd span { font-size: 13px; }
       }
       @media (max-width: 980px) {
-        .top nav { display: none; }
-        .top .button { margin-left: auto; }
+        .top .wrap { gap: 16px; }
+        .top .wrap > .button { order: 1; margin-left: auto; }
+        .toggle:not([hidden]) { display: grid; }
+        .top.open { background: var(--ground); border-bottom-color: var(--line); -webkit-backdrop-filter: none; backdrop-filter: none; }
+        .top nav { display: none; position: absolute; top: calc(100% + 1px); left: 0; right: 0; flex-direction: column; gap: 0; height: calc(100vh - 73px); height: calc(100dvh - 73px); margin: 0; padding: 8px 24px max(24px, env(safe-area-inset-bottom)); background: var(--ground); overflow-y: auto; overscroll-behavior: contain; }
+        .top.open nav { display: flex; }
+        .top nav a:not(.button) { padding: 18px 0; border-bottom: 1px solid var(--line); font-size: 24px; line-height: 32px; letter-spacing: -0.02em; }
         .grid, .build .wrap { grid-template-columns: minmax(0, 1fr); }
         .mine { min-height: 340px; }
         .build .wrap { gap: 40px; }
@@ -163,6 +174,10 @@
         body { font-size: 16px; }
         .wrap { padding: 0 16px; }
         .top .wrap { height: 64px; gap: 12px; }
+        .top .wrap > .button { display: none; }
+        .toggle { margin-left: auto; }
+        .top nav { height: calc(100vh - 65px); height: calc(100dvh - 65px); padding-left: 16px; padding-right: 16px; }
+        .top nav .button { display: flex; flex: none; margin-top: auto; }
         .brand img { height: 22px; }
         .actions .button { flex: 1 1 auto; }
         .cards { grid-template-columns: minmax(0, 1fr); }
@@ -190,12 +205,17 @@
     <header class="top" id="top">
       <div class="wrap">
         <a class="brand" href="./" aria-label="LONGYU Network"><img src="./lockup.svg" alt="LONGYU" width="150" height="26" /></a>
-        <nav aria-label="Main">
+        <button class="toggle" id="menu-button" type="button" aria-label="Open the menu" aria-expanded="false" aria-controls="menu" hidden>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path class="bars" d="M4 7h16M4 12h16M4 17h16" /><path class="cross" d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+        <nav id="menu" aria-label="Main">
           <a href="{{MINE_URL}}/">Mine</a>
           <a href="{{APP_URL}}/bridge.html">Bridge</a>
           <a href="{{APP_URL}}/swap.html">Swap</a>
+          <a href="{{APP_URL}}/">Claim</a>
           <a href="{{EXPLORER_URL}}/">Explorer</a>
           <a href="{{GITHUB_URL}}" rel="noopener" data-optional="GITHUB_URL">GitHub</a>
+          <a class="button" href="{{MINE_URL}}/">Start mining</a>
         </nav>
         <a class="button small" href="{{MINE_URL}}/">Start mining</a>
       </div>

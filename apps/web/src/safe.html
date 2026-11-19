@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>LONGYU Safe</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https: http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'" />
+    <style>
+      :root { --bg: #F4F9FE; --card: #FFFFFF; --card-high: #EAF2FC; --text: #0A1F3D; --muted: #4B5F7D; --faint: #5F718A; --accent: #0B6FDB; --accent-deep: #0857AD; --on-accent: #FFFFFF; --positive: #0B8058; --danger: #D92D20; --border: rgba(10, 31, 61, 0.12); color-scheme: light; }
+      [hidden] { display: none !important; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; }
+      main { max-width: 560px; margin: 0 auto; padding: 32px 16px; display: grid; gap: 16px; }
+      /* Grid columns may shrink below their content, so nothing can push the page wider than a phone. */
+      main, .card, .box, .grid, .actions { grid-template-columns: minmax(0, 1fr); }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 12px; }
+      .muted { color: var(--muted); font-size: 14px; }
+      .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+      .row > :last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+      button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; font-family: inherit; }
+      button:where(:hover:not(:disabled)) { background: var(--accent-deep); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      button.link { background: none; color: var(--accent); padding: 10px 0; margin: -6px 0; font-size: 14px; justify-self: start; }
+      button.quiet { background: var(--card-high); color: var(--text); border: 1px solid var(--border); }
+      a { color: var(--accent); }
+      h1 { display: flex; align-items: center; gap: 12px; font-size: 24px; letter-spacing: -0.02em; margin: 0; }
+      h2 { font-size: 16px; margin: 0; }
+      .seal { height: 28px; width: auto; flex: none; }
+      .seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--card-high); border-radius: 12px; }
+      .seg button { background: transparent; color: var(--muted); padding: 10px; font-size: 15px; border-radius: 9px; }
+      .seg button[aria-pressed="true"], .seg button[aria-pressed="true"]:hover { background: var(--card); color: var(--text); box-shadow: 0 1px 2px rgba(10, 31, 61, 0.12); }
+      .seg button:hover:not(:disabled) { background: none; color: var(--text); }
+      .box { background: var(--card-high); border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; display: grid; gap: 2px; }
+      .box:focus-within { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .box label { color: var(--muted); font-size: 13px; }
+      .box input, .box textarea, .box select { width: 100%; box-sizing: border-box; background: none; color: var(--text); border: 0; padding: 0; font: inherit; }
+      .box input:focus, .box textarea:focus, .box select:focus { outline: none; }
+      .box select { margin-left: -4px; width: calc(100% + 4px); }
+      .box select option { background: var(--card-high); color: var(--text); }
+      .box textarea { resize: vertical; min-height: 72px; }
+      .mono, .box input.mono, .box textarea.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+      /* Phones zoom the page when a focused field's text is under 16px. */
+      @media (pointer: coarse) { .box input.mono, .box textarea.mono { font-size: 16px; } }
+      .num { font-variant-numeric: tabular-nums; }
+      ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+      li { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+      li > :first-child { min-width: 0; overflow-wrap: anywhere; }
+      .tag { color: var(--faint); font-size: 13px; white-space: nowrap; }
+      .tag.yes { color: var(--positive); }
+      .data { max-height: 140px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; }
+      .bad, #error { color: var(--danger); }
+      #error:empty, #status:empty, #warn:empty, #t-note:empty { display: none; }
+      #args:empty, #t-args:empty, #owners:empty, #approvals:empty { display: none !important; }
+      .actions { display: grid; gap: 8px; }
+      /* Last, so it wins over the rules above. */
+      @media (max-width: 400px) { main { padding: 20px 12px; } .card { padding: 16px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1><img class="seal" src="./mark.svg" alt="" width="23" height="28" />Safe</h1>
+      <section class="card" id="safe-card">
+        <div class="muted" id="closed" hidden>Opens when LONGYU testnet launches.</div>
+        <div class="seg" role="group" aria-label="Chain" id="chain">
+          <button type="button" data-chain="97" aria-pressed="false">BSC Testnet</button>
+          <button type="button" data-chain="668801" aria-pressed="true">LONGYU</button>
+        </div>
+        <div class="box">
+          <label for="safe">Safe</label>
+          <input id="safe" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" maxlength="42" />
+        </div>
+        <button type="button" class="quiet" id="open">Open</button>
+        <div id="info" class="grid" hidden style="display: grid; gap: 12px">
+          <div class="row"><span class="muted">Signatures needed</span><span class="num" id="threshold">–</span></div>
+          <div class="row"><span class="muted">Balance</span><span class="num" id="balance">–</span></div>
+          <div class="row"><span class="muted">Next nonce</span><span class="num" id="nonce">–</span></div>
+          <div class="bad" id="warn"></div>
+          <ul id="owners" aria-label="Signers"></ul>
+        </div>
+      </section>
+
+      <section class="card" id="new-card" hidden>
+        <h2>New transaction</h2>
+        <div class="box">
+          <label for="to">To</label>
+          <input id="to" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" maxlength="42" />
+        </div>
+        <div class="box">
+          <label for="value">Amount, tBNB</label>
+          <input id="value" class="num" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0" maxlength="80" />
+        </div>
+        <div class="box">
+          <label for="call">Call</label>
+          <select id="call"></select>
+        </div>
+        <div id="args" class="grid" style="display: grid; gap: 12px"></div>
+        <div class="box" id="raw-box" hidden>
+          <label for="raw">Data</label>
+          <textarea id="raw" class="mono" autocomplete="off" spellcheck="false" placeholder="0x…"></textarea>
+        </div>
+        <div class="box">
+          <label for="tx-nonce">Nonce</label>
+          <input id="tx-nonce" class="num" type="text" inputmode="numeric" autocomplete="off" maxlength="18" />
+        </div>
+        <button type="button" id="create">Create</button>
+      </section>
+
+      <section class="card" id="tx-card" hidden>
+        <h2>Transaction</h2>
+        <div class="row"><span class="muted">To</span><span class="mono" id="t-to"></span></div>
+        <div class="row"><span class="muted">Amount</span><span class="num" id="t-value"></span></div>
+        <div class="row"><span class="muted">Call</span><span id="t-call"></span></div>
+        <div id="t-args" class="grid" style="display: grid; gap: 12px"></div>
+        <div class="mono data" id="t-data" hidden></div>
+        <div class="row"><span class="muted">Nonce</span><span class="num" id="t-nonce"></span></div>
+        <div class="row"><span class="muted">Hash</span><span class="mono" id="t-hash"></span></div>
+        <div class="row"><span class="muted">Approvals</span><span class="num" id="t-count">–</span></div>
+        <ul id="approvals" aria-label="Approvals"></ul>
+        <div class="muted" id="t-note"></div>
+        <div class="box">
+          <label for="link">Link for the other signers</label>
+          <input id="link" class="mono" type="text" readonly />
+        </div>
+        <div class="actions">
+          <button type="button" class="quiet" id="copy">Copy link</button>
+          <button type="button" id="approve" hidden>Approve</button>
+          <button type="button" id="execute" hidden>Execute</button>
+          <button type="button" class="link" id="discard">New transaction</button>
+        </div>
+      </section>
+
+      <button type="button" id="connect">Connect wallet</button>
+      <a id="tx" hidden target="_blank" rel="noopener noreferrer"></a>
+      <div class="muted" id="status"></div>
+      <div id="error"></div>
+    </main>
+    <script type="module" src="./safe.js"></script>
+  </body>
+</html>

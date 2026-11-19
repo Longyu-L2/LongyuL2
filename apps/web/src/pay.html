@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>LONGYU Payment</title>
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https: http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'" />
+    <style>
+      :root { --bg: #F4F9FE; --card: #FFFFFF; --card-high: #EAF2FC; --text: #0A1F3D; --muted: #4B5F7D; --faint: #5F718A; --accent: #0B6FDB; --accent-deep: #0857AD; --on-accent: #FFFFFF; --positive: #0B8058; --danger: #D92D20; --border: rgba(10, 31, 61, 0.12); color-scheme: light; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; min-height: 100vh; }
+      main { max-width: 560px; margin: 0 auto; padding: 32px 16px; display: grid; gap: 16px; }
+      .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; display: grid; gap: 12px; }
+      .muted { color: var(--muted); font-size: 14px; }
+      .faint { color: var(--faint); font-size: 13px; text-align: center; }
+      .row { display: flex; justify-content: space-between; gap: 12px; }
+      .big { font-size: 24px; font-weight: 600; }
+      button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 12px; padding: 14px; font-size: 16px; font-weight: 600; cursor: pointer; }
+      button:where(:hover:not(:disabled)) { background: var(--accent-deep); }
+      button:disabled { opacity: 0.5; cursor: default; }
+      a { color: var(--accent); }
+      h1 { display: flex; align-items: center; gap: 12px; font-size: 24px; letter-spacing: -0.02em; }
+      .seal { height: 28px; width: auto; flex: none; }
+      #error { color: var(--danger); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1><img class="seal" src="./mark.svg" alt="" width="23" height="28" />Payment</h1>
+      <section class="card">
+        <div class="muted">Order</div>
+        <div class="big" id="description">–</div>
+        <div class="row"><span class="muted">Price</span><span class="big" id="amount">–</span></div>
+        <div class="row"><span class="muted">Status</span><span id="state">–</span></div>
+        <div class="row"><span class="muted">Pay before</span><span id="expires">–</span></div>
+        <button id="pay" hidden>Pay with wallet</button>
+        <a id="tx" hidden target="_blank" rel="noopener noreferrer"></a>
+        <div class="muted" id="status"></div>
+        <div id="error"></div>
+      </section>
+      <p class="muted faint">BNB Smart Chain · paid from your own wallet</p>
+    </main>
+    <script type="module" src="./pay.js"></script>
+  </body>
+</html>

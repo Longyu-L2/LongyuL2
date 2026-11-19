@@ -1,0 +1,33 @@
+{
+  "name": "@longyu/explorer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LONGYU Scan: block explorer for the LONGYU L2 (indexer, server-rendered pages, JSON and Etherscan-compatible API)",
+  "main": "src/server.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/html.test.ts test/format.test.ts test/indexer.test.ts test/pages.test.ts test/node-fallback.test.ts test/origin.test.ts",
+    "test:e2e": "node --import tsx --test test/e2e.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.16",
+    "@fastify/rate-limit": "11.2.2",
+    "@longyu/abis": "0.1.0",
+    "fastify": "5.12.8",
+    "pg": "8.23.1",
+    "viem": "2.58.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

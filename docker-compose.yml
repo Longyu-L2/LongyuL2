@@ -1,0 +1,38 @@
+# Backend stack for one server: Postgres + the API (which also runs the background jobs).
+# The LONGYU chain itself (sequencer, batcher, proposer) runs separately; see chain/README.md.
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: longyu
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: longyu
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U longyu"]
+      interval: 10s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    env_file: apps/api/.env
+    environment:
+      DATABASE_URL: postgres://longyu:${POSTGRES_PASSWORD}@postgres:5432/longyu
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Bound to localhost only: expose it through Cloudflare (for example a cloudflared tunnel),
+    # never directly, or the region block and rate limits can be bypassed.
+    ports:
+      - "127.0.0.1:8080:8080"
+    # Only used when STORAGE_BUCKET is blank (development); production keeps data files in the bucket.
+    volumes:
+      - rootdata:/data
+
+volumes:
+  pgdata:
+  rootdata:

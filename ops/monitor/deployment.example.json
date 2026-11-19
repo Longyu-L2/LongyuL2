@@ -1,0 +1,42 @@
+{
+  "alerts": {
+    "telegramChatId": ""
+  },
+  "networks": {
+    "longyu_testnet": {
+      "name": "LONGYU Testnet",
+      "chainId": 668801,
+      "rpcEnv": "LONGYU_TESTNET_RPC_URL",
+      "blockTimeMs": 250,
+      "confirmations": 10,
+      "explorerTx": "https://scan-testnet.longyu.network/tx/"
+    },
+    "bsc_testnet": {
+      "name": "BNB Smart Chain Testnet",
+      "chainId": 97,
+      "rpcEnv": "BSC_TESTNET_RPC_URL",
+      "blockTimeMs": 450,
+      "confirmations": 15,
+      "explorerTx": "https://testnet.bscscan.com/tx/"
+    },
+    "bsc_mainnet": {
+      "name": "BNB Smart Chain",
+      "chainId": 56,
+      "rpcEnv": "BSC_RPC_URL",
+      "blockTimeMs": 450,
+      "confirmations": 15,
+      "explorerTx": "https://bscscan.com/tx/"
+    }
+  },
+  "contracts": {
+    "miningDistributor": { "network": "longyu_testnet", "address": "" },
+    "miningVault": { "network": "longyu_testnet", "address": "" },
+    "faucet": { "network": "longyu_testnet", "address": "" },
+    "paymentRouter": { "network": "bsc_mainnet", "address": "" },
+    "l2OutputOracle": { "network": "bsc_testnet", "address": "" },
+    "systemConfig": { "network": "bsc_testnet", "address": "" },
+    "superchainConfig": { "network": "bsc_testnet", "address": "" },
+    "migrationDistributor": { "network": "bsc_mainnet", "address": "" }
+  },
+  "largeClaimWei": "5000000000000000000000"
+}

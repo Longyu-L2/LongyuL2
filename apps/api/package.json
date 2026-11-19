@@ -29,7 +29,7 @@
     "@longyu/reward-engine": "0.1.0",
     "fastify": "5.12.8",
     "jose": "6.2.17",
-    "node-app-attest": "1.0.1",
+    "node-app-attest": "2.2.0",
     "pg": "8.23.1",
     "viem": "2.58.0",
     "zod": "4.6.7"

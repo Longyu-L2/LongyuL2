@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
-import { signIn, takeSignInError } from "@/lib/core";
+import { signIn, signInFailure } from "@/lib/core";
 import { useApp } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
+import { embeddedBrowser } from "@/lib/x-auth";
 import { colors, radius, space } from "@/design/tokens";
 import { useWide } from "@/design/layout";
-import { Brand, Button, ErrorText, Input, Screen, T } from "@/components/ui";
+import { Brand, Button, ErrorText, Input, Notice, Screen, T } from "@/components/ui";
 import { Pearl } from "@/components/Pearl";
 
 export default function SignInScreen() {
@@ -16,9 +17,12 @@ export default function SignInScreen() {
   const [busy, setBusy] = useState(false);
   // In a browser the page comes back from X as a fresh load: a sign-in that failed there is reported here.
   const [error, setError] = useState(() => {
-    const back = takeSignInError();
+    const back = signInFailure();
     return back ? t(errorKeyOf(back)) : "";
   });
+  // A browser inside another app can pass the visit to X to a different browser, which comes back
+  // without this one's secret. A page added to the home screen is not one of those.
+  const embedded = Platform.OS === "web" && embeddedBrowser(navigator.userAgent) && !(navigator as { standalone?: boolean }).standalone;
 
   const start = async () => {
     if (busy) return;
@@ -51,6 +55,7 @@ export default function SignInScreen() {
       />
       <Button title={t("continueWithX")} onPress={() => void start()} busy={busy} />
       <ErrorText>{error}</ErrorText>
+      {embedded && !error ? <Notice tone="warning">{t("openInBrowser")}</Notice> : null}
       {Platform.OS === "web" ? (
         // The site that serves this page also holds the app (apps/mobile/site/server.mjs).
         <Button title={t("getAndroidApp")} kind="ghost" size="sm" icon="download" onPress={() => window.location.assign("/download/android")} />

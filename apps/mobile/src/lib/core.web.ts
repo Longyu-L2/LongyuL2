@@ -10,7 +10,7 @@ import { openHumanCheck } from "./human-check-dom";
 import { pickLanguage, translator } from "./i18n";
 import { request } from "./request";
 import { checkKey, exportableKey, storedKey, walletKeyName, type KeyStore, type WalletOwner } from "./wallet-key";
-import { hex, readWebReturn, toBase64Url, type AuthReturn, type XProof } from "./x-auth";
+import { hex, readWebReturn, returnErrorCode, toBase64Url, type AuthReturn, type XProof } from "./x-auth";
 
 // ------------------------------------------------------------------- config
 
@@ -247,11 +247,9 @@ function takePending(): Pending | null {
 let signInError: { code: string; status?: number } | null = null;
 let walletChange: { proof: XProof } | { error: ApiError } | null = null;
 
-/** Why the sign-in this page came back from did not open a session, once. Null when there is nothing to say. */
-export function takeSignInError(): { code: string; status?: number } | null {
-  const e = signInError;
-  signInError = null;
-  return e;
+/** Why the sign-in this page came back from did not open a session, until the next one starts. Null when there is nothing to say. */
+export function signInFailure(): { code: string; status?: number } | null {
+  return signInError;
 }
 
 /** True when the page came back from the X sign-in that replacing a wallet asks for, until that result is used. */
@@ -269,19 +267,19 @@ function resumeOnce(): Promise<void> {
 
 async function resume(back: AuthReturn): Promise<void> {
   const pending = takePending();
-  const failed = "error" in back ? (back.error === "denied" ? "x_denied" : "x_failed") : null;
   if (!pending) {
-    // Nothing here was waiting for this return: an old link, or one opened in a different browser.
-    if (!tokens) signInError = { code: failed ?? "x_failed" };
+    // Nothing here was waiting for this return: the sign-in was started in a different browser or
+    // app, which holds the secret its ticket needs, or the link is an old one.
+    if (!tokens) signInError = { code: "ticket" in back ? "x_elsewhere" : returnErrorCode(back.error) };
     return;
   }
   if (pending.purpose === "wallet-change") {
     if (!tokens) return;
-    walletChange = "ticket" in back ? { proof: { ticket: back.ticket, appVerifier: pending.appVerifier } } : { error: new ApiError(0, failed ?? "x_failed") };
+    walletChange = "ticket" in back ? { proof: { ticket: back.ticket, appVerifier: pending.appVerifier } } : { error: new ApiError(0, returnErrorCode(back.error)) };
     return;
   }
   if (!("ticket" in back)) {
-    signInError = { code: failed ?? "x_failed" };
+    signInError = { code: returnErrorCode(back.error) };
     return;
   }
   try {
@@ -348,6 +346,7 @@ export async function signInWithX(purpose: Purpose): Promise<XProof | null> {
 
 /** Leaves for X; the session opens when the page loads again (`loadTokens`). */
 export async function signIn(referralCode?: string): Promise<boolean> {
+  signInError = null;
   return leaveForX("sign-in", referralCode);
 }
 

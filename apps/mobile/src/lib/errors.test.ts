@@ -5,7 +5,8 @@ import { en } from "./i18n.ts";
 
 test("every known error code has wording of its own", () => {
   const codes = {
-    x_denied: "xDenied", x_failed: "xFailed", ticket_invalid: "xFailed", sign_in_unavailable: "xFailed", reauth_required: "xFailed",
+    x_denied: "xDenied", x_failed: "xFailed", x_too_soon: "xTooSoon", x_elsewhere: "xOtherBrowser", x_paused: "xPaused", x_too_many: "xTooMany",
+    ticket_invalid: "xFailed", sign_in_unavailable: "xFailed", reauth_required: "xFailed",
     reauth_invalid: "xWrongAccount", wallet_change_cooldown: "walletCooldown",
     account_restricted: "accountRestricted", region_blocked: "regionBlocked", region_unknown: "regionBlocked", web_mining_unavailable: "webMiningOff",
     device_locked: "deviceLocked", device_unknown: "deviceCheckFailed", device_not_attested: "deviceCheckFailed",

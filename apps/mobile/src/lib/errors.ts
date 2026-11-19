@@ -8,6 +8,10 @@ const KEYS: Record<string, StringKey> = {
   // sign-in
   x_denied: "xDenied",
   x_failed: "xFailed",
+  x_too_soon: "xTooSoon",
+  x_elsewhere: "xOtherBrowser",
+  x_paused: "xPaused",
+  x_too_many: "xTooMany",
   ticket_invalid: "xFailed",
   sign_in_unavailable: "xFailed",
   reauth_required: "xFailed",

@@ -151,7 +151,9 @@ export function registerAuth(app: FastifyInstance, deps: Deps): void {
       reply.redirect(web ? `${web}#${result}` : `${deps.config.APP_AUTH_REDIRECT}?${result}`, 302);
     const code = typeof query.code === "string" ? query.code : "";
     if (query.error !== undefined || code.length === 0 || code.length > 2000) {
-      return back(query.error === "access_denied" ? "error=denied" : "error=failed");
+      const denied = query.error === "access_denied";
+      req.log.info({ client: login.client, denied }, "X sign-in came back without a code");
+      return back(denied ? "error=denied" : "error=failed");
     }
     // X bills each read of an account, so a day has a ceiling, and one client a small ceiling of
     // its own: otherwise a single client could use up the day and nobody else could sign in. Both
@@ -203,7 +205,11 @@ export function registerAuth(app: FastifyInstance, deps: Deps): void {
        RETURNING id`,
       [account.id, account.username, sha256Hex(ticket), now + TICKET_TTL, login.id, now - X_ACCOUNT_COOLOFF, account.avatar],
     )).rows[0];
-    if (!stored) return back("error=too_soon");
+    if (!stored) {
+      req.log.info({ client: login.client }, "X sign-in refused: this X account signed in a moment ago");
+      return back("error=too_soon");
+    }
+    req.log.info({ client: login.client }, "X sign-in confirmed: ticket handed out");
     return back(`ticket=${ticket}`);
   });
 
@@ -264,7 +270,10 @@ export function registerAuth(app: FastifyInstance, deps: Deps): void {
       return { userId: user.id, deviceId, created, refreshToken };
     });
     // The transaction commits either way, so a ticket that failed a check stays used.
-    if (result.error) throw forbidden(result.error);
+    if (result.error) {
+      req.log.warn({ client }, "sign-in ticket refused");
+      throw forbidden(result.error);
+    }
     const { userId, deviceId, created, refreshToken } = result as { userId: string; deviceId: string; created: boolean; refreshToken: string };
     const accessToken = await issueAccessToken(deps, { userId, deviceId });
     return { accessToken, refreshToken, newUser: created };

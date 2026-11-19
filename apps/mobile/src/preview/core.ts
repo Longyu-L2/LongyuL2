@@ -145,7 +145,7 @@ export const importWallet = async (_owner: WalletOwner, _key: string): Promise<P
 export const exportWalletKey = async (_owner: WalletOwner): Promise<string | null> => `0x${"5a".repeat(32)}`;
 export const signInWithX = async (_purpose: "sign-in" | "wallet-change"): Promise<XProof | null> => ({ ticket: "preview", appVerifier: "preview" });
 export const signIn = async (_referralCode?: string) => true;
-export const takeSignInError = (): { code: string; status?: number } | null => null;
+export const signInFailure = (): { code: string; status?: number } | null => null;
 export const walletChangeReturned = () => false;
 export const linkWallet = async (_a: PrivateKeyAccount, _reauth?: { reauthTicket: string; appVerifier: string }) => undefined;
 export const devicePlatform = () => "android" as const;

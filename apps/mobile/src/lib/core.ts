@@ -11,7 +11,7 @@ import { generatePrivateKey, privateKeyToAccount, type PrivateKeyAccount } from 
 import { createSiweMessage } from "viem/siwe";
 import { request } from "./request";
 import { checkKey, exportableKey, storedKey, walletKeyName, type KeyStore, type WalletOwner } from "./wallet-key";
-import { AUTH_REDIRECT, hex, readAuthReturn, toBase64Url, type XProof } from "./x-auth";
+import { AUTH_REDIRECT, hex, readAuthReturn, returnErrorCode, toBase64Url, type XProof } from "./x-auth";
 
 // viem needs crypto.getRandomValues for key generation.
 const g = globalThis as unknown as { crypto?: { getRandomValues?: (a: Uint8Array) => Uint8Array } };
@@ -185,7 +185,7 @@ export async function signInWithX(purpose: "sign-in" | "wallet-change"): Promise
     else if (Platform.OS === "android" && got.url === null) await new Promise((r) => setTimeout(r, RETURN_GRACE_MS));
     if (got.url === null) return null;
     const back = readAuthReturn(got.url);
-    if ("error" in back) throw new ApiError(0, back.error === "denied" ? "x_denied" : "x_failed");
+    if ("error" in back) throw new ApiError(0, returnErrorCode(back.error));
     return { ticket: back.ticket, appVerifier };
   } finally {
     links.remove();
@@ -203,7 +203,7 @@ export async function signIn(referralCode?: string): Promise<boolean> {
 }
 
 /** For the web build, whose page reloads on the way back from X and reports a failed sign-in here. The app hears it from `signIn`. */
-export function takeSignInError(): { code: string; status?: number } | null {
+export function signInFailure(): { code: string; status?: number } | null {
   return null;
 }
 

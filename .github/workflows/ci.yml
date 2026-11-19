@@ -1,0 +1,86 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: v1.5.1
+      - name: Install libraries
+        working-directory: contracts
+        run: |
+          forge install --no-git foundry-rs/forge-std@v1.17.0
+          forge install --no-git OpenZeppelin/openzeppelin-contracts@v5.6.1
+      - name: Test
+        working-directory: contracts
+        run: forge test
+
+  dex:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: v1.5.1
+      - name: Install libraries
+        working-directory: contracts/dex
+        run: forge install --no-git foundry-rs/forge-std@v1.17.0
+      - name: Test
+        working-directory: contracts/dex
+        run: forge test
+
+  services:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - uses: foundry-rs/foundry-toolchain@dba66c27052e63476d886f22216e119ba7e615bf # v1.9.2
+        with:
+          version: v1.5.1
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test --workspace @longyu/reward-engine
+      - run: npm test --workspace @longyu/signer
+      - run: npm test --workspace @longyu/api
+      - name: API end to end against Anvil
+        run: npm run test:e2e --workspace @longyu/api
+      - run: npm test --workspace @longyu/explorer
+      - name: Explorer end to end against Anvil
+        run: npm run test:e2e --workspace @longyu/explorer
+      - run: npm test --workspace @longyu/web
+      - run: npm run build --workspace @longyu/web
+      - name: RPC gateway
+        run: npm run test:rpc
+      - name: Deployment and monitoring configs
+        run: npm run typecheck:ops && npm run test:ops
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+      - run: npm ci --legacy-peer-deps
+        working-directory: apps/mobile
+      - run: npm run typecheck
+        working-directory: apps/mobile
+      - run: npm test
+        working-directory: apps/mobile

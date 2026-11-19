@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>LONGYU Admin</title>
+    <link rel="icon" href="/admin/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/admin/app.css" />
+  </head>
+  <body>
+    <header class="top">
+      <img src="/admin/icon.svg" alt="" width="24" height="24" />
+      <strong>LONGYU Admin</strong>
+      <span id="who" class="muted"></span>
+      <button id="signout" class="link" hidden>Sign out</button>
+    </header>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <main id="app"></main>
+    <noscript>The admin console needs JavaScript.</noscript>
+    <script type="module" src="/admin/app.js"></script>
+  </body>
+</html>

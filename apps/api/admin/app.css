@@ -1,0 +1,48 @@
+/* Colours come from brand/tokens.json. */
+:root {
+  --bg: #F4F9FE; --card: #FFFFFF; --text: #0A1F3D; --muted: #4B5F7D; --accent: #0B6FDB; --on-accent: #FFFFFF; --border: rgba(10, 31, 61, 0.17);
+  --danger: #D92D20; --warn: #A8610B; --ok: #0B8058;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+.top { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--card); }
+.top strong { font-size: 16px; }
+.top img { display: block; border-radius: 5px; }
+.muted { color: var(--muted); }
+main { padding: 16px; max-width: 1400px; margin: 0 auto; }
+.status { padding: 0 16px; min-height: 0; }
+.status.show { padding: 8px 16px; border-bottom: 1px solid var(--border); }
+.status.error { color: var(--danger); }
+.status.ok { color: var(--ok); }
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 12px; }
+nav.tabs button { background: transparent; color: var(--text); border: 1px solid var(--border); }
+nav.tabs button[aria-current="page"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button { background: var(--accent); color: var(--on-accent); border: 0; border-radius: 8px; padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; }
+button.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); }
+button.danger { background: var(--danger); color: #fff; }
+button.link { background: none; color: var(--accent); padding: 0; margin-left: auto; font-weight: 500; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+input, select, textarea { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+textarea { width: 100%; min-height: 56px; }
+label { display: grid; gap: 4px; }
+.wide { grid-column: 1 / -1; }
+.form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); align-items: end; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+code, .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: 12px; overflow-wrap: anywhere; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); font-size: 12px; white-space: nowrap; }
+.pill.hold, .pill.review, .pill.underpaid, .pill.wrong_token, .pill.late, .pill.unknown_order, .pill.not_open, .pill.wrong_treasury, .pill.vetoed { color: var(--warn); border-color: var(--warn); }
+.pill.paid, .pill.activated, .pill.active, .pill.executed, .pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.warn { color: var(--warn); border-color: var(--warn); }
+.pill.critical, .pill.banned { color: #fff; background: var(--danger); border-color: var(--danger); }
+.pill.cancelled, .pill.rejected, .pill.refunded, .pill.superseded { color: var(--muted); }
+.empty { color: var(--muted); padding: 12px 0; }
+.login { max-width: 420px; margin: 48px auto; }
+.login .row input { flex: 1; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }

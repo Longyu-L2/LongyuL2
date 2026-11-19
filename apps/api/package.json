@@ -1,0 +1,43 @@
+{
+  "name": "@longyu/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LONGYU MINE backend: auth, sessions, trust, settlement, publishing, relaying, indexing",
+  "main": "src/server.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "start": "tsx src/server.ts",
+    "migrate": "tsx src/db/migrate-cli.ts",
+    "test": "node --import tsx --test --test-concurrency=1 test/api.test.ts test/jobs.test.ts test/signer.test.ts test/remote-signer.test.ts test/migration.test.ts test/storage.test.ts test/payments.test.ts test/admin.test.ts test/health.test.ts test/sweep.test.ts test/origin.test.ts test/android-attestation.test.ts test/boosts.test.ts test/x-auth.test.ts test/web-mining.test.ts",
+    "migration:snapshot": "tsx scripts/migration-snapshot.ts",
+    "storage:check": "tsx scripts/storage-check.ts",
+    "test:e2e": "node --import tsx --test test/e2e.test.ts test/server.test.ts",
+    "devnet": "tsx scripts/devnet.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "3.1170.0",
+    "@aws-sdk/client-s3": "3.1170.0",
+    "@electric-sql/pglite": "0.5.16",
+    "@fastify/cors": "11.4.3",
+    "@fastify/rate-limit": "11.2.2",
+    "@longyu/abis": "0.1.0",
+    "@longyu/reward-engine": "0.1.0",
+    "fastify": "5.12.8",
+    "jose": "6.2.17",
+    "node-app-attest": "1.0.1",
+    "pg": "8.23.1",
+    "viem": "2.58.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@types/pg": "8.23.1",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

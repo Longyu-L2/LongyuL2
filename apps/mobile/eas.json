@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 27.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "env": {
+        "APP_VARIANT": "development"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "testnet": {
+      "distribution": "internal",
+      "environment": "preview",
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "testnet",
+        "EXPO_PUBLIC_API_URL": "https://api-testnet.longyu.network",
+        "EXPO_PUBLIC_DEV_ATTESTATION": "false"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "distribution": "internal",
+      "environment": "production",
+      "autoIncrement": true,
+      "env": {
+        "APP_VARIANT": "production",
+        "EXPO_PUBLIC_API_URL": "https://api.longyu.network",
+        "EXPO_PUBLIC_DEV_ATTESTATION": "false"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}

@@ -71,9 +71,9 @@ export const radius = { sm: 8, md: 12, lg: 16, xl: 24, pill: 999 } as const;
 /**
  * One layout for every size of window. From `wide` up (a computer, a tablet on its side) the tabs
  * become a side rail and a screen sets its content in columns; below it, one column the width of
- * a phone.
+ * a phone. From `roomy` up there is room for a third column.
  */
-export const layout = { wide: 1024, column: 560, page: 1120, rail: 248 } as const;
+export const layout = { wide: 1024, roomy: 1280, column: 560, page: 1200, rail: 248 } as const;
 
 /** Numbers that change in place (timers, balances) keep their width. */
 export const tabular: TextStyle = { fontVariant: ["tabular-nums"] };

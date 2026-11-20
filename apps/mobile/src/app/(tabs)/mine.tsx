@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { router } from "expo-router";
 import { api, ApiError, attestDevice, proveSession } from "@/lib/core";
 import { useApp, useSymbol } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
 import { refresh, useClockOffset, useResource } from "@/lib/resources";
 import { nextCheck } from "@/lib/server-clock";
-import { capacityClass, fill, formatDuration, formatToken, formatTokenFixed, multiplier, sessionProgress } from "@/lib/format";
+import { boostPercent, capacityClass, fill, formatDuration, formatToken, formatTokenFixed, multiplier, sessionProgress } from "@/lib/format";
+import { inviteLinkFor } from "@/lib/invite-link";
 import { colors, space, tabular } from "@/design/tokens";
-import { useWide } from "@/design/layout";
+import { useRoomy, useWide } from "@/design/layout";
 import { failure, success } from "@/design/haptics";
-import { Brand, Button, Callout, Card, Col, Columns, ErrorText, Figure, Header, List, Metrics, Pill, Row, Screen, Section, Skeleton, T } from "@/components/ui";
+import { Brand, Button, Callout, Card, Col, Columns, ErrorText, Figure, Header, List, Metrics, Panel, Pill, Progress, Row, Screen, Section, Skeleton, T } from "@/components/ui";
 import { Pearl, type PearlState } from "@/components/Pearl";
 import { PulseCheck } from "@/components/PulseCheck";
-import { LiveAmount } from "@/components/Rewards";
+import { LiveAmount, LiveFigure, RewardBar, RewardLine } from "@/components/Rewards";
 
 interface Status {
   day: string;
@@ -24,19 +26,26 @@ interface Status {
   nextAllowedAt: string | null;
   estimatedPerHour: string;
   boostBps: number;
+  /** What today's counted invites add, in bps. Absent from an API without the invite bonus. */
+  invites?: { active: number; bps: number; bpsEach: number; capBps: number };
   /** Null until the account has a wallet. */
   balances?: object | null;
 }
 interface Capacity {
   today: string;
   plans: { id: string; boostBps: number }[];
-  current: { boost_bps: number; end_day: string } | null;
+  current: { boost_bps: number; start_day: string; end_day: string } | null;
 }
+
+// In a wide window: the inside of a panel, and a panel that fills its column.
+const panelBody = { padding: space.xl, gap: space.lg } as const;
+const grow = { flexGrow: 1 } as const;
 
 export default function MineScreen() {
   const { t, me, network } = useApp();
   const symbol = useSymbol();
   const wide = useWide();
+  const roomy = useRoomy();
   const { width } = useWindowDimensions();
   const loaded = useResource<Status>("/v1/mining/status");
   const status = loaded.data ?? null;
@@ -50,6 +59,7 @@ export default function MineScreen() {
   const [error, setError] = useState("");
   const [pulse, setPulse] = useState(false);
   const pending = useRef<{ challengeId: string; nonce: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(() => Promise.all([refresh("/v1/mining/status"), refresh("/v1/boosts")]), []);
 
@@ -128,16 +138,16 @@ export default function MineScreen() {
   // An answer that never came is said once; what is on the screen stays when a later one fails.
   const shown = error || (!status && loaded.error ? t(errorKeyOf(loaded.error)) : "");
   // The dial fills a phone's width, and grows with the window beside the rail.
-  const dial = wide ? (width >= 1240 ? 320 : 264) : Math.min(256, width - 104);
+  const dial = wide ? (roomy ? 272 : 232) : Math.min(256, width - 104);
   const rated = Boolean(status && status.estimatedPerHour !== "0");
 
   const readout = !status ? (
-    <Skeleton width={150} height={40} />
+    <Skeleton width={wide ? 220 : 150} height={wide ? 56 : 40} />
   ) : mining && rated ? (
-    <SessionAmount perHour={status.estimatedPerHour} startedAt={Number(session!.startedAt)} endsAt={Number(session!.endsAt)} offset={offset} large={wide && width >= 1240} />
+    <SessionAmount perHour={status.estimatedPerHour} startedAt={Number(session!.startedAt)} endsAt={Number(session!.endsAt)} offset={offset} wide={wide} />
   ) : (
     <>
-      <T variant="display" style={tabular}>
+      <T variant={wide ? "hero" : "display"} style={tabular}>
         {mining ? formatDuration(Number(session!.endsAt) - now) : state === "ready" ? t("readyTitle") : status.nextAllowedAt ? formatDuration(Number(status.nextAllowedAt) - now) : "–"}
       </T>
       <T variant="label" color={colors.textSoft}>{mining ? t("sessionEnds") : state === "ready" ? t("tapPearl") : t("nextSession")}</T>
@@ -157,29 +167,147 @@ export default function MineScreen() {
     </View>
   );
 
+  const metrics = [
+    { label: t("rate"), hint: `${symbol}/h`, value: status ? formatToken(status.estimatedPerHour, 3) : "–" },
+    { label: t("power"), value: multiplier(status?.boostBps ?? 0), color: status?.boostBps ? colors.primary : colors.text },
+    { label: t("streak"), value: status ? String(status.streakDays) : "–", unit: t("daysShort") },
+    { label: t("miningDay"), value: status?.day ?? "–" },
+  ];
+  // Mining needs no identity check. It is asked for before mainnet conversion, once checks are open.
+  const verify = network?.verificationOpen && me && me.tier < 2 ? <Callout icon="shield" title={t("verifyIdentity")} body={t("verifyBody")} onPress={() => router.push("/profile")} /> : null;
+  const pulseCheck = (
+    <PulseCheck
+      visible={pulse}
+      title={t("humanCheck")}
+      onToken={(token) => { setPulse(false); void start(token); }}
+      onCancel={() => { setPulse(false); setBusy(false); pending.current = null; }}
+    />
+  );
+
+  if (wide) {
+    // Shown while the invite bonus is running.
+    const invites = status?.invites && status.invites.bpsEach > 0 ? status.invites : null;
+    // In a browser an invite is a link to this site; the app shares the code.
+    const link = me ? inviteLinkFor(me.referralCode) : "";
+    const copyInvite = async () => {
+      if (!me) return;
+      await Clipboard.setStringAsync(link || me.referralCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    };
+
+    const rewards = status?.balances ? (
+      <Panel title={t("rewards")} action={<Button size="sm" kind="ghost" title={t("tabWallet")} onPress={() => router.push("/wallet")} />} style={grow}>
+        <View style={panelBody}>
+          <View style={{ gap: 2 }}>
+            <T variant="label" color={colors.textSoft}>{t("mined")}</T>
+            <LiveFigure part="earned" unit={symbol} size="display" />
+          </View>
+          <RewardBar />
+          <View style={{ gap: space.sm }}>
+            <RewardLine part="claimable" label={t("available")} />
+            <RewardLine part="pending" label={t("pending")} />
+            <RewardLine part="claimed" label={t("claimed")} />
+          </View>
+        </View>
+      </Panel>
+    ) : null;
+
+    const plans = (
+      <Panel title={t("capacityTitle")} action={<Button size="sm" kind="ghost" title={t("manage")} onPress={() => router.push("/boost")} />} style={grow}>
+        <View style={panelBody}>
+          <View style={{ gap: 2 }}>
+            <T variant="label" color={colors.textSoft}>{plan ?? t("capacityStandard")}</T>
+            <T variant="display" color={current ? colors.primary : colors.text} style={tabular}>{multiplier(current?.boost_bps ?? 0)}</T>
+          </View>
+          {current ? (
+            <View style={{ gap: space.sm }}>
+              <Progress value={(Number(capacity!.today) - Number(current.start_day)) / Math.max(1, Number(current.end_day) - Number(current.start_day))} />
+              <T variant="label" color={colors.textSoft}>{fill(t("epochEndsIn"), { n: daysLeft })}</T>
+            </View>
+          ) : (
+            <T variant="label" color={colors.textSoft}>{t("noActivePlan")}</T>
+          )}
+        </View>
+      </Panel>
+    );
+
+    const invite = me ? (
+      <Panel
+        title={t("invites")}
+        action={<Button size="sm" kind="ghost" icon={copied ? "check" : link ? "link" : "copy"} title={copied ? t("copied") : t(link ? "copyLink" : "copyCode")} onPress={() => void copyInvite()} />}
+        style={grow}
+      >
+        <View style={panelBody}>
+          {invites ? (
+            <View style={{ gap: 2 }}>
+              <T variant="label" color={colors.textSoft}>{t("inviteBonus")}</T>
+              <T variant="display" style={tabular}>{invites.bps > 0 ? boostPercent(invites.bps) : "–"}</T>
+            </View>
+          ) : null}
+          <View style={{ gap: space.sm }}>
+            {invites ? <Line label={t("activeToday")} value={String(invites.active)} /> : null}
+            <Line label={t("inviteCode")} value={me.referralCode} mono />
+          </View>
+        </View>
+      </Panel>
+    ) : null;
+
+    return (
+      <Screen onRefresh={load}>
+        <Header title={t("tabMine")} />
+
+        <Card padding={0} style={{ gap: 0 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: roomy ? 56 : 36, paddingHorizontal: roomy ? 48 : space.xxxl, paddingVertical: space.xxxl }}>
+            <Pearl state={state} progress={progress} size={dial} onPress={canTap ? () => void begin() : undefined} label={t(state === "ready" ? "startMining" : state)} />
+            <View style={{ flex: 1, minWidth: 0, gap: space.xl }}>
+              <View style={{ gap: 4 }}>{readout}</View>
+              {state === "ready" ? (
+                <View style={{ alignSelf: "flex-start", minWidth: 220 }}>
+                  <Button title={t("startMining")} onPress={() => void begin()} busy={busy} disabled={!canTap} />
+                </View>
+              ) : null}
+              {shown ? <ErrorText>{shown}</ErrorText> : null}
+            </View>
+          </View>
+          <Metrics bare columns={4} items={metrics} />
+        </Card>
+
+        {verify}
+
+        {roomy ? (
+          <Columns stretch>
+            <Col>{rewards}</Col>
+            <Col>{plans}</Col>
+            <Col>{invite}</Col>
+          </Columns>
+        ) : (
+          <Columns stretch>
+            <Col flex={1.15}>{rewards}</Col>
+            <Col>
+              {plans}
+              {invite}
+            </Col>
+          </Columns>
+        )}
+
+        {pulseCheck}
+      </Screen>
+    );
+  }
+
   return (
     <Screen onRefresh={load}>
-      {wide ? (
-        <Header title={t("tabMine")} right={<Pill text={t("testnet")} />} />
-      ) : (
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
-          <Brand />
-          <Pill text={t("testnet")} />
-        </View>
-      )}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
+        <Brand />
+        <Pill text={t("testnet")} />
+      </View>
 
       <Columns>
-        <Col flex={1.05}>{wide ? <Card padding={space.xxxl}>{hero}</Card> : hero}</Col>
+        <Col>{hero}</Col>
 
         <Col>
-          <Metrics
-            items={[
-              { label: t("rate"), hint: `${symbol}/h`, value: status ? formatToken(status.estimatedPerHour, 3) : "–" },
-              { label: t("power"), value: multiplier(status?.boostBps ?? 0), color: status?.boostBps ? colors.primary : colors.text },
-              { label: t("streak"), value: status ? String(status.streakDays) : "–", unit: t("daysShort") },
-              { label: t("miningDay"), value: status?.day ?? "–" },
-            ]}
-          />
+          <Metrics items={metrics} />
 
           {status?.balances ? (
             <Section title={t("rewards")}>
@@ -191,8 +319,7 @@ export default function MineScreen() {
             </Section>
           ) : null}
 
-          {/* Mining needs no identity check. It is asked for before mainnet conversion, once checks are open. */}
-          {network?.verificationOpen && me && me.tier < 2 ? <Callout icon="shield" title={t("verifyIdentity")} body={t("verifyBody")} onPress={() => router.push("/profile")} /> : null}
+          {verify}
 
           <List>
             <Row
@@ -206,13 +333,18 @@ export default function MineScreen() {
         </Col>
       </Columns>
 
-      <PulseCheck
-        visible={pulse}
-        title={t("humanCheck")}
-        onToken={(token) => { setPulse(false); void start(token); }}
-        onCancel={() => { setPulse(false); setBusy(false); pending.current = null; }}
-      />
+      {pulseCheck}
     </Screen>
+  );
+}
+
+/** A name and its value on one line of a panel. */
+function Line({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: space.md, minHeight: 24 }}>
+      <T variant="body" color={colors.textSoft} numberOfLines={1}>{label}</T>
+      <T variant={mono ? "mono" : "bodyStrong"} selectable={mono} style={[tabular, { flexShrink: 1 }]} numberOfLines={1}>{value}</T>
+    </View>
   );
 }
 
@@ -220,7 +352,7 @@ export default function MineScreen() {
  * What the running session has earned so far, at the estimated rate. It counts on the device, a
  * second at a time; the amount paid is set by the day's settlement.
  */
-function SessionAmount({ perHour, startedAt, endsAt, offset, large }: { perHour: string; startedAt: number; endsAt: number; offset: number; large: boolean }) {
+function SessionAmount({ perHour, startedAt, endsAt, offset, wide }: { perHour: string; startedAt: number; endsAt: number; offset: number; wide: boolean }) {
   const { t } = useApp();
   const symbol = useSymbol();
   const [device, setDevice] = useState(Date.now());
@@ -232,9 +364,23 @@ function SessionAmount({ perHour, startedAt, endsAt, offset, large }: { perHour:
   const ms = device + offset;
   const elapsed = Math.max(0, Math.min(ms, endsAt * 1000) - startedAt * 1000);
   const amount = (BigInt(perHour) * BigInt(Math.floor(elapsed))) / 3_600_000n;
+  if (wide) {
+    return (
+      <View style={{ gap: space.xl }}>
+        <View style={{ gap: 2 }}>
+          <T variant="label" color={colors.textSoft}>{t("sessionEstimate")}</T>
+          <Figure value={formatTokenFixed(amount, 4)} unit={symbol} size="figure" />
+        </View>
+        <View style={{ gap: space.sm }}>
+          <Progress value={elapsed / Math.max(1, (endsAt - startedAt) * 1000)} />
+          <T variant="label" color={colors.textSoft} style={tabular}>{fill(t("sessionLeft"), { time: formatDuration(endsAt - ms / 1000) })}</T>
+        </View>
+      </View>
+    );
+  }
   return (
     <>
-      <Figure value={formatTokenFixed(amount, 4)} unit={symbol} size={large ? "figure" : "hero"} />
+      <Figure value={formatTokenFixed(amount, 4)} unit={symbol} size="hero" />
       <T variant="label" color={colors.textSoft} center>
         {`${t("sessionEstimate")} · ${fill(t("sessionLeft"), { time: formatDuration(endsAt - ms / 1000) })}`}
       </T>

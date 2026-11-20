@@ -7,7 +7,7 @@ import { useApp } from "@/lib/app-state";
 import { useLiveBalances, useUnlock } from "@/lib/resources";
 import { shares } from "@/lib/rewards";
 import { fill, formatTokenFixed } from "@/lib/format";
-import { colors, tabular } from "@/design/tokens";
+import { colors, space, tabular } from "@/design/tokens";
 import { Figure, Skeleton, T } from "./ui";
 
 export type RewardPart = "earned" | "claimable" | "pending" | "claimed";
@@ -15,19 +15,30 @@ export type RewardPart = "earned" | "claimable" | "pending" | "claimed";
 /** The colour of each part, in the bar and beside its name. */
 export const partColor = { claimable: colors.primary, pending: colors.azure, claimed: "#C3D3E8" } as const;
 
-export function LiveAmount({ part, unit, color = colors.text }: { part: RewardPart; unit?: string; color?: string }) {
+export function LiveAmount({ part, unit, color = colors.text, variant = "bodyStrong" }: { part: RewardPart; unit?: string; color?: string; variant?: "bodyStrong" | "number" }) {
   const live = useLiveBalances();
   return (
-    <T variant="bodyStrong" color={color} style={tabular} numberOfLines={1}>
+    <T variant={variant} color={color} style={tabular} numberOfLines={1}>
       {live ? `${formatTokenFixed(live[part], 4)}${unit ? ` ${unit}` : ""}` : "–"}
     </T>
   );
 }
 
 /** The screen's one large number. */
-export function LiveFigure({ part, unit }: { part: RewardPart; unit: string }) {
+export function LiveFigure({ part, unit, size = "hero" }: { part: RewardPart; unit: string; size?: "display" | "hero" | "figure" }) {
   const live = useLiveBalances();
-  return live ? <Figure value={formatTokenFixed(live[part], 4)} unit={unit} /> : <Skeleton width={210} height={46} />;
+  return live ? <Figure value={formatTokenFixed(live[part], 4)} unit={unit} size={size} /> : <Skeleton width={210} height={size === "display" ? 36 : size === "figure" ? 62 : 46} />;
+}
+
+/** One part of what was mined, by name, with the bar's colour for it. */
+export function RewardLine({ part, label }: { part: Exclude<RewardPart, "earned">; label: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm + 2, minHeight: 24 }}>
+      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: partColor[part] }} />
+      <T variant="body" color={colors.textSoft} style={{ flex: 1 }} numberOfLines={1}>{label}</T>
+      <LiveAmount part={part} />
+    </View>
+  );
 }
 
 /** Everything mined as one bar: what can be claimed, what is waiting for settlement, what was claimed. */
@@ -50,7 +61,7 @@ const UNLOCK_STRING = {
 } as const;
 
 /** Under the claim button while there is nothing to claim: when the pending rewards can be. */
-export function UnlockNote() {
+export function UnlockNote({ center = true }: { center?: boolean }) {
   const { t } = useApp();
   const live = useLiveBalances();
   const unlock = useUnlock();
@@ -61,5 +72,5 @@ export function UnlockNote() {
         date: unlock.at.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
       })
     : t("pendingHint");
-  return <T variant="small" color={colors.textSoft} center>{line}</T>;
+  return <T variant="small" color={colors.textSoft} center={center}>{line}</T>;
 }

@@ -5,3 +5,8 @@ import { layout } from "./tokens";
 export function useWide(): boolean {
   return useWindowDimensions().width >= layout.wide;
 }
+
+/** True in a window with room for three columns beside the rail. */
+export function useRoomy(): boolean {
+  return useWindowDimensions().width >= layout.roomy;
+}

@@ -17,6 +17,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
   type StyleProp,
   type TextInputProps,
   type TextStyle,
@@ -88,6 +89,8 @@ export function Screen({ children, scroll = true, onRefresh, edges = ["top"], wi
       }
     : undefined;
   const panel = wide && width === "column";
+  // Beside the rail the ground is flat: the page is cards on one colour.
+  const flat = wide && width === "page" && !center;
   const body = (
     <View style={[styles.inner, wide && width === "page" && styles.innerPage, panel && styles.innerPanel, center && !panel && styles.innerCenter]}>
       {children}
@@ -95,7 +98,7 @@ export function Screen({ children, scroll = true, onRefresh, edges = ["top"], wi
   );
   return (
     <SafeAreaView edges={edges} style={styles.screen}>
-      <Backdrop />
+      {flat ? null : <Backdrop />}
       {scroll ? (
         <ScrollView
           contentContainerStyle={[styles.scroll, (panel || center) && styles.scrollCenter]}
@@ -113,15 +116,15 @@ export function Screen({ children, scroll = true, onRefresh, edges = ["top"], wi
   );
 }
 
-/** Side by side in a wide window, one under the other on a phone. Holds `Col`s. */
-export function Columns({ children }: { children: ReactNode }) {
+/** Side by side in a wide window, one under the other on a phone. Holds `Col`s. `stretch` gives them one height. */
+export function Columns({ children, stretch }: { children: ReactNode; stretch?: boolean }) {
   const wide = useWide();
-  return <View style={wide ? styles.columnsWide : styles.columns}>{children}</View>;
+  return <View style={wide ? [styles.columnsWide, stretch && { alignItems: "stretch" }] : styles.columns}>{children}</View>;
 }
 
 export function Col({ children, flex = 1 }: { children: ReactNode; flex?: number }) {
   const wide = useWide();
-  return <View style={[styles.columns, wide && { flex, minWidth: 0 }]}>{children}</View>;
+  return <View style={[styles.columns, wide && { flex, minWidth: 0, gap: space.xxl }]}>{children}</View>;
 }
 
 export function Header({ title, right }: { title: string; right?: ReactNode }) {
@@ -201,16 +204,18 @@ export function Brand({ size = 17 }: { size?: number }) {
  * The one large number of a screen, with its unit. A long number is set smaller so that it always
  * fits a phone's width.
  */
-export function Figure({ value, unit, size = "hero", color = colors.text }: { value: string; unit?: string; size?: "hero" | "figure"; color?: string }) {
+export function Figure({ value, unit, size = "hero", color = colors.text }: { value: string; unit?: string; size?: "display" | "hero" | "figure"; color?: string }) {
+  const { width } = useWindowDimensions();
   const base = type[size];
-  const fits = 9;
+  // The narrowest phones hold fewer characters at full size.
+  const fits = width < 340 ? 7 : width < 380 ? 8 : 9;
   const scale = value.length > fits ? Math.max(0.55, fits / value.length) : 1;
   return (
     <View style={styles.figure}>
       <Text numberOfLines={1} style={[base, styles.tabular, { color, flexShrink: 1 }, scale < 1 && { fontSize: Math.round(base.fontSize * scale), letterSpacing: base.letterSpacing * scale }]}>
         {value}
       </Text>
-      {unit ? <T variant="headline" color={colors.textSoft}>{unit}</T> : null}
+      {unit ? <T variant={size === "display" ? "label" : "headline"} color={colors.textSoft}>{unit}</T> : null}
     </View>
   );
 }
@@ -225,6 +230,19 @@ export function Card({ children, style, padding = space.lg, selected }: {
   selected?: boolean;
 }) {
   return <View style={[styles.card, { padding }, selected && { borderColor: colors.primary }, style]}>{children}</View>;
+}
+
+/** A card with a head: what it holds, and one way to go further. Its body brings its own padding. */
+export function Panel({ title, action, children, style }: { title: string; action?: ReactNode; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[styles.card, { gap: 0 }, style]}>
+      <View style={[styles.panelHead, action ? { paddingRight: space.sm } : null]}>
+        <T variant="bodyStrong" style={{ flex: 1 }} numberOfLines={1} accessibilityRole="header">{title}</T>
+        {action}
+      </View>
+      {children}
+    </View>
+  );
 }
 
 export function Divider({ vertical }: { vertical?: boolean }) {
@@ -417,7 +435,8 @@ export interface Metric {
  * Figures in a grid, split by hairlines. On its own surface, or `bare` at the foot of a card that
  * has no padding of its own.
  */
-export function Metrics({ items, columns = 2, bare }: { items: Metric[]; columns?: 2 | 3 | 4; bare?: boolean }) {
+export function Metrics({ items, columns = 2, bare, size = "md" }: { items: Metric[]; columns?: 2 | 3 | 4; bare?: boolean; size?: "md" | "lg" }) {
+  const large = size === "lg";
   const rows: Metric[][] = [];
   for (let i = 0; i < items.length; i += columns) rows.push(items.slice(i, i + columns));
   return (
@@ -425,13 +444,13 @@ export function Metrics({ items, columns = 2, bare }: { items: Metric[]; columns
       {rows.map((row, r) => (
         <View key={r} style={[{ flexDirection: "row" }, (r > 0 || bare) && styles.cellTop]}>
           {row.map((it, i) => (
-            <View key={it.label} style={[styles.cell, i > 0 && styles.cellLeft]}>
+            <View key={it.label} style={[styles.cell, large && styles.cellLarge, i > 0 && styles.cellLeft]}>
               <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
-                <T variant="small" color={colors.textSoft} numberOfLines={1} style={{ flexShrink: 1 }}>{it.label}</T>
+                <T variant={large ? "label" : "small"} color={colors.textSoft} numberOfLines={1} style={{ flexShrink: 1 }}>{it.label}</T>
                 {it.hint ? <T variant="small" color={colors.textFaint} numberOfLines={1}>{it.hint}</T> : null}
               </View>
               <View style={styles.valueRow}>
-                <T variant="number" color={it.color ?? colors.text} style={[styles.tabular, { flexShrink: 1 }]} numberOfLines={1}>{it.value}</T>
+                <T variant={large ? "display" : "number"} color={it.color ?? colors.text} style={[styles.tabular, { flexShrink: 1 }]} numberOfLines={1}>{it.value}</T>
                 {it.unit ? <T variant="small" color={colors.textSoft}>{it.unit}</T> : null}
               </View>
             </View>
@@ -444,15 +463,19 @@ export function Metrics({ items, columns = 2, bare }: { items: Metric[]; columns
   );
 }
 
-/** A grouped list on one surface; rows are separated by hairlines. */
-export function List({ children, bare }: { children: ReactNode; bare?: boolean }) {
+/**
+ * A grouped list on one surface; rows are separated by hairlines. `bare` at the foot of a card that
+ * has no padding of its own, `flush` straight under a panel's head.
+ */
+export function List({ children, bare, flush }: { children: ReactNode; bare?: boolean; flush?: boolean }) {
   const rows = (Array.isArray(children) ? children : [children]).flat().filter(Boolean);
   if (rows.length === 0) return null;
+  const inside = bare || flush;
   return (
-    <View style={bare ? null : [styles.card, { padding: 0, gap: 0 }]}>
+    <View style={inside ? null : [styles.card, { padding: 0, gap: 0 }]}>
       {rows.map((row, i) => (
         <View key={i}>
-          {i > 0 || bare ? <View style={[styles.rowDivider, bare && { marginLeft: 0 }]} /> : null}
+          {i > 0 || bare ? <View style={[styles.rowDivider, inside && { marginLeft: 0 }]} /> : null}
           {row}
         </View>
       ))}
@@ -584,6 +607,10 @@ const styles = StyleSheet.create({
   sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 2, minHeight: 20 },
   figure: { flexDirection: "row", alignItems: "baseline", gap: space.sm },
   card: { backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, gap: space.md, overflow: "hidden" },
+  panelHead: {
+    flexDirection: "row", alignItems: "center", gap: space.md, minHeight: 52, paddingHorizontal: space.xl,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.lineStrong,
+  },
   callout: { flexDirection: "row", gap: space.md, borderRadius: radius.lg, borderWidth: 1, paddingHorizontal: space.lg, paddingVertical: 14 },
   empty: { alignItems: "center", justifyContent: "center", gap: space.sm, paddingVertical: space.xxxl, paddingHorizontal: space.xl },
   pill: { flexDirection: "row", alignItems: "center", alignSelf: "flex-start", gap: 6, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 5 },
@@ -591,6 +618,7 @@ const styles = StyleSheet.create({
   buttonInner: { flexDirection: "row", alignItems: "center", gap: space.sm },
   iconButton: { width: 40, height: 40, borderRadius: radius.md, backgroundColor: colors.surfaceHigh, alignItems: "center", justifyContent: "center" },
   cell: { flex: 1, minWidth: 0, gap: 4, paddingHorizontal: space.lg, paddingVertical: 14 },
+  cellLarge: { gap: 6, paddingHorizontal: space.xxl, paddingVertical: space.xl },
   cellLeft: { borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.lineStrong },
   cellTop: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.lineStrong },
   valueRow: { flexDirection: "row", alignItems: "baseline", gap: 4 },

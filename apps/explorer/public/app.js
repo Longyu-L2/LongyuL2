@@ -74,8 +74,15 @@
   }
 
   // On a narrow screen the row of tabs scrolls sideways: start it where the open tab is.
+  // The row is laid out again when the web font arrives, so it is placed once more then.
   const tab = document.querySelector(".tabs a.on");
-  if (tab) tab.parentElement.scrollLeft = tab.offsetLeft - tab.parentElement.offsetLeft - 16;
+  if (tab) {
+    const place = () => {
+      tab.parentElement.scrollLeft = tab.offsetLeft - tab.parentElement.offsetLeft - 16;
+    };
+    place();
+    if (document.fonts) document.fonts.ready.then(place);
+  }
 
   // The verification form: single-file settings show for a single file, and a file can be read into the source box.
   const form = document.getElementById("verify-form");

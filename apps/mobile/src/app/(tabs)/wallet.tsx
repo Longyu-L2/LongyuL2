@@ -5,7 +5,8 @@ import { router, useFocusEffect } from "expo-router";
 import { api, loadWallet, recall } from "@/lib/core";
 import { useApp, useSymbol } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
-import { useResource } from "@/lib/resources";
+import { followClaim, useResource } from "@/lib/resources";
+import { openClaim, type Claim } from "@/lib/rewards";
 import { isWalletOf } from "@/lib/wallet-key";
 import { shortAddress } from "@/lib/format";
 import { colors, radius, space } from "@/design/tokens";
@@ -18,7 +19,7 @@ import { LiveAmount, LiveFigure, RewardBar, RewardLine, UnlockNote, partColor } 
 interface Rewards {
   address: string;
   claimable: string;
-  claims: { id: string; status: "queued" | "sent" | "confirmed" | "skipped" | "failed"; tx_hash: string | null; created_at: string }[];
+  claims: Claim[];
 }
 
 export default function WalletScreen() {
@@ -30,8 +31,9 @@ export default function WalletScreen() {
   const r = rewards.data;
   const address = me?.wallet ?? r?.address ?? null;
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
+  // The claim this screen asked for, until the next one: how it ended is said under the button.
+  const [asked, setAsked] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   // Whether this device holds the key of the linked wallet. A browser may mine for a wallet whose key is
   // kept elsewhere, and a wallet replaced on another device leaves only the old one's key here.
@@ -48,12 +50,12 @@ export default function WalletScreen() {
   const claim = async () => {
     setBusy(true);
     setError("");
-    setMsg("");
+    setAsked(null);
     try {
-      await api("POST", "/v1/rewards/claim");
+      const { claimId } = await api<{ claimId: string }>("POST", "/v1/rewards/claim");
       success();
-      setMsg(t("claimQueued"));
-      await rewards.refresh();
+      setAsked(claimId);
+      await followClaim();
     } catch (e) {
       setError(t(errorKeyOf(e)));
     } finally {
@@ -69,10 +71,14 @@ export default function WalletScreen() {
   };
 
   const explorer = (path: string) => network && Linking.openURL(`${network.explorerUrl}/${path}`);
-  const claimTitle = (s: Rewards["claims"][number]["status"]) =>
+  const claimTitle = (s: Claim["status"]) =>
     ({ queued: t("claimStatusQueued"), sent: t("claimStatusSent"), confirmed: t("claimStatusConfirmed"), skipped: t("claimStatusSkipped"), failed: t("claimStatusFailed") })[s];
   const date = (s: string, year?: boolean) => new Date(Number(s) * 1000).toLocaleDateString(undefined, { month: "short", day: "numeric", ...(year ? { year: "numeric" } : null) });
-  const shown = error || (!r && rewards.error ? t(errorKeyOf(rewards.error)) : "");
+  // A claim on its way holds the button until it has landed: the rewards are read again by themselves.
+  const claiming = openClaim(r?.claims) !== null;
+  const msg = claiming ? t("claimQueued") : "";
+  const failed = asked !== null && r?.claims.find((c) => c.id === asked)?.status === "failed";
+  const shown = error || (failed ? t("claimStatusFailed") : !r && rewards.error ? t(errorKeyOf(rewards.error)) : "");
   const canClaim = Boolean(r && r.claimable !== "0");
 
   const links = [
@@ -118,7 +124,7 @@ export default function WalletScreen() {
           <View style={{ flex: 1, minWidth: 0 }}>
             {msg ? <Notice tone="success">{msg}</Notice> : shown ? <ErrorText>{shown}</ErrorText> : <UnlockNote center={false} />}
           </View>
-          <Button title={t("claim")} onPress={() => void claim()} busy={busy} disabled={!canClaim} />
+          <Button title={t("claim")} onPress={() => void claim()} busy={busy || claiming} disabled={!canClaim} />
         </View>
       </Card>
     );
@@ -234,10 +240,10 @@ export default function WalletScreen() {
               </View>
             </View>
             <View style={{ gap: space.md }}>
-              <Button title={t("claim")} onPress={() => void claim()} busy={busy} disabled={!canClaim} />
+              <Button title={t("claim")} onPress={() => void claim()} busy={busy || claiming} disabled={!canClaim} />
               <Notice tone="success">{msg}</Notice>
-              <ErrorText>{shown}</ErrorText>
-              {!msg && !error ? <UnlockNote /> : null}
+              <ErrorText>{msg ? "" : shown}</ErrorText>
+              {!msg && !shown ? <UnlockNote /> : null}
             </View>
           </Card>
 

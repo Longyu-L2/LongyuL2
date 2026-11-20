@@ -7,7 +7,7 @@ import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { api } from "./core";
 import { createCache, type Entry } from "./cache";
-import { liveBalances, newer, unlockOf, type Balances, type Live, type Reading, type Unlock } from "./rewards";
+import { claimPollDelay, liveBalances, newer, openClaim, unlockOf, type Balances, type Claim, type Live, type Reading, type Unlock } from "./rewards";
 import { clockOffset, steadyOffset } from "./server-clock";
 
 // The account's balances come with two answers (mining status and rewards); the later one counts.
@@ -23,8 +23,32 @@ function setReading(next: Reading | null, clock: number | null = offset) {
   watchers.forEach((fn) => fn());
 }
 
+// A claim on its way to the wallet: when it was first seen, and the timer of the next look at it.
+let following: { since: number; timer: ReturnType<typeof setTimeout> } | null = null;
+
+/**
+ * While a claim is on its way the rewards are read again every few seconds, so the balances, the claim
+ * button and the activity list follow it to its end on whatever screen is open. Each answer sets the
+ * next look, or ends them; a look that fails leaves the one after it standing.
+ */
+function follow(open: boolean): void {
+  if (following) clearTimeout(following.timer);
+  if (!open) {
+    following = null;
+    return;
+  }
+  const since = following?.since ?? Date.now();
+  const timer = setTimeout(() => {
+    follow(true);
+    // A hidden tab or a backgrounded app waits; the screen reads again when it comes back.
+    if (AppState.currentState === "active") void cache.load("/v1/rewards", true);
+  }, claimPollDelay(Date.now() - since));
+  following = { since, timer };
+}
+
 const cache = createCache((path) => api<unknown>("GET", path), {
   onData(path, data) {
+    if (path === "/v1/rewards") follow(openClaim((data as { claims?: Claim[] }).claims) !== null);
     const balances = path === "/v1/rewards" ? (data as Balances) : path === "/v1/mining/status" ? (data as { balances?: Balances | null }).balances : null;
     if (!balances) return;
     const receivedAt = Date.now();
@@ -40,8 +64,15 @@ export function prefetch(paths: readonly string[]): void {
 /** Asks for `path` again, whatever is held. */
 export const refresh = (path: string): Promise<void> => cache.load(path, true);
 
+/** A claim was just asked for: reads the rewards now, and keeps reading until it has landed. */
+export function followClaim(): Promise<void> {
+  follow(true);
+  return cache.load("/v1/rewards", true);
+}
+
 /** Forgets every answer: the account signed out. */
 export function clearResources(): void {
+  follow(false);
   cache.clear();
   setReading(null);
 }

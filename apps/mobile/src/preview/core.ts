@@ -7,6 +7,8 @@
  *   new:     an account made today, with identity checks open
  *   posted:  nothing to claim, yesterday's rewards in a settlement that opens later today
  *   unsettled: nothing to claim, the running day's rewards due after its settlement
+ *   claiming: a claim on its way to the wallet
+ * Pressing the claim button walks a claim through its states: queued, sent, then confirmed.
  */
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import type { WalletOwner } from "../lib/wallet-key";
@@ -20,10 +22,10 @@ export class ApiError extends Error {
   }
 }
 
-type Scenario = "mining" | "ready" | "resting" | "new" | "posted" | "unsettled";
+type Scenario = "mining" | "ready" | "resting" | "new" | "posted" | "unsettled" | "claiming";
 const scenario = (): Scenario => {
   const s = new URLSearchParams(globalThis.location?.search ?? "").get("s");
-  return s === "ready" || s === "resting" || s === "new" || s === "posted" || s === "unsettled" ? s : "mining";
+  return s === "ready" || s === "resting" || s === "new" || s === "posted" || s === "unsettled" || s === "claiming" ? s : "mining";
 };
 
 const E18 = 10n ** 18n;
@@ -32,20 +34,29 @@ const wei = (whole: number) => (BigInt(Math.round(whole * 10_000)) * E18 / 10_00
 // A throwaway key that exists only in the preview; it never signs anything.
 const account = privateKeyToAccount(`0x${"5a".repeat(32)}`);
 
+// When the claim button was pressed (ms), and how far the claim it made has got.
+let claimAt: number | null = null;
+const claimStage = (s: Scenario): "queued" | "sent" | "confirmed" | null => {
+  if (claimAt === null) return s === "claiming" ? "queued" : null;
+  const age = Date.now() - claimAt;
+  return age < 5000 ? "queued" : age < 9000 ? "sent" : "confirmed";
+};
+
 const startedAt = (s: Scenario) =>
-  s === "mining" || s === "unsettled" ? now() - 6 * 3600 - 18 * 60 : s === "resting" || s === "posted" ? now() - 20 * 3600 : null;
+  s === "mining" || s === "unsettled" || s === "claiming" ? now() - 6 * 3600 - 18 * 60 : s === "resting" || s === "posted" ? now() - 20 * 3600 : null;
 
 /** The account's balances, as both the mining status and the rewards answer carry them. */
 function balances(s: Scenario) {
   const started = startedAt(s);
   const fresh = s === "new";
   // Nothing to claim: what the other states show as claimable is already claimed here.
-  const waiting = s === "posted" || s === "unsettled";
+  const landed = claimStage(s) === "confirmed";
+  const waiting = s === "posted" || s === "unsettled" || landed;
   return {
     earned: wei(fresh ? 0 : 1286.4521), claimed: wei(fresh ? 0 : waiting ? 1241.5081 : 1198.73), claimable: wei(fresh || waiting ? 0 : 42.7781), pending: wei(fresh ? 0 : 44.944),
     entitled: wei(fresh ? 0 : 1286.4521),
     accrual: started === null ? null : { perHour: wei(s === "mining" ? 1.7825 : 1.1883), until: String(started + 86_400) },
-    unlock: s === "posted" ? { at: String(now() + 2 * 3600 + 31 * 60), exact: true } : s === "unsettled" ? { at: String(now() + 26 * 3600), exact: false } : null,
+    unlock: s === "posted" ? { at: String(now() + 2 * 3600 + 31 * 60), exact: true } : s === "unsettled" ? { at: String(now() + 26 * 3600), exact: false } : landed ? { at: String(Math.floor(claimAt! / 60_000) * 60 + 26 * 3600), exact: false } : null,
     at: String(now()),
   };
 }
@@ -112,10 +123,13 @@ function fixture(method: string, path: string): unknown {
   }
   if (path === "/v1/rewards") {
     const fresh = s === "new";
+    const stage = claimStage(s);
+    const made = Math.floor((claimAt ?? Date.now() - 4000) / 1000);
     return {
       address: account.address, activeRootDay: String(day - 1),
       ...balances(s),
       claims: fresh ? [] : [
+        ...(stage ? [{ id: "c4", status: stage, cumulative: stage === "queued" ? null : wei(1241.5081), tx_hash: stage === "queued" ? null : `0x${"b4".repeat(32)}`, created_at: String(made) }] : []),
         { id: "c3", status: "confirmed", cumulative: wei(1198.73), tx_hash: `0x${"7e".repeat(32)}`, created_at: String(now() - 86_400) },
         { id: "c2", status: "confirmed", cumulative: wei(1154.2), tx_hash: `0x${"3c".repeat(32)}`, created_at: String(now() - 3 * 86_400) },
         { id: "c1", status: "confirmed", cumulative: wei(1009.5), tx_hash: `0x${"9d".repeat(32)}`, created_at: String(now() - 7 * 86_400) },
@@ -129,6 +143,10 @@ function fixture(method: string, path: string): unknown {
   }
   if (path === "/v1/mining/challenge") return { challengeId: "preview", nonce: "00", pulseRequired: false };
   if (path === "/v1/boosts/orders") return { orderId: `0x${"cd".repeat(32)}`, payUrl: "https://testnet.longyu.network/pay.html?order=0x" };
+  if (path === "/v1/rewards/claim") {
+    if (claimStage(s) === null || claimStage(s) === "confirmed") claimAt = Date.now();
+    return { claimId: "c4", status: "queued" };
+  }
   if (method === "POST") return {};
   throw new ApiError(404, "not_found", `no preview data for ${path}`);
 }

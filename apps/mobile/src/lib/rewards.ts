@@ -122,3 +122,24 @@ export function shares(live: Pick<Live, "earned" | "claimed" | "claimable" | "pe
   const part = (v: bigint) => Number((v * 10_000n) / live.earned) / 10_000;
   return { claimed: part(live.claimed), claimable: part(live.claimable), pending: part(live.pending) };
 }
+
+/** A claim as the rewards answer lists it, newest first. */
+export interface Claim {
+  id: string;
+  status: "queued" | "sent" | "confirmed" | "skipped" | "failed";
+  tx_hash: string | null;
+  created_at: string;
+}
+
+/** The claim still on its way to the wallet: waiting for the relayer, or sent and not yet confirmed. */
+export function openClaim(claims: readonly Claim[] | null | undefined): Claim | null {
+  return claims?.find((c) => c.status === "queued" || c.status === "sent") ?? null;
+}
+
+/**
+ * How long to wait before reading the rewards again while a claim is on its way, `waitedMs` after it
+ * was first seen. A claim lands within seconds; one that does not is asked about less and less often.
+ */
+export function claimPollDelay(waitedMs: number): number {
+  return waitedMs < 60_000 ? 2500 : waitedMs < 600_000 ? 10_000 : 30_000;
+}

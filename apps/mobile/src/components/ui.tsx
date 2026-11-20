@@ -384,14 +384,12 @@ export function Button({ title, onPress, busy, disabled, kind = "primary", icon,
             : [{ backgroundColor: hoveredIn(s) && !off ? c.hover : c.bg }, c.border ? { borderWidth: 1, borderColor: c.border } : null],
         ]}
       >
-        {busy ? (
-          <ActivityIndicator color={c.fg} />
-        ) : (
-          <View style={styles.buttonInner}>
-            {icon ? <Icon name={icon} size={small ? 14 : 18} color={fg} strokeWidth={2} /> : null}
-            <T variant="bodyStrong" color={fg} numberOfLines={1} style={small ? { fontSize: 13, lineHeight: 18 } : { fontSize: 15.5 }}>{title}</T>
-          </View>
-        )}
+        {/* The title keeps its place under the spinner, so a busy button stays as wide as it was. */}
+        <View style={[styles.buttonInner, busy ? { opacity: 0 } : null]}>
+          {icon ? <Icon name={icon} size={small ? 14 : 18} color={fg} strokeWidth={2} /> : null}
+          <T variant="bodyStrong" color={fg} numberOfLines={1} style={small ? { fontSize: 13, lineHeight: 18 } : { fontSize: 15.5 }}>{title}</T>
+        </View>
+        {busy ? <ActivityIndicator color={c.fg} style={StyleSheet.absoluteFill} /> : null}
       </Pressable>
     </Animated.View>
   );

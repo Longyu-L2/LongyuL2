@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { liveBalances, newer, shares, unlockOf, type Reading } from "./rewards.ts";
+import { claimPollDelay, liveBalances, newer, openClaim, shares, unlockOf, type Claim, type Reading } from "./rewards.ts";
 
 const E18 = 10n ** 18n;
 const T0 = 1_800_000_000_000;
@@ -163,4 +163,22 @@ test("no unlock time is made up from an answer that carries none, or a broken on
   assert.equal(unlockOf(reading({ unlock: { at: 1795176999 as unknown as string, exact: true } }).balances, now), null);
   // Anything but true is the scheduled kind: the wording never claims more than the answer said.
   assert.equal(unlockOf(reading({ unlock: { at: String(local(20, 17) / 1000), exact: "yes" as unknown as boolean } }).balances, now)!.exact, false);
+});
+
+test("the open claim is the one queued or sent", () => {
+  const row = (id: string, status: Claim["status"]): Claim => ({ id, status, tx_hash: null, created_at: "1000" });
+  assert.equal(openClaim(null), null);
+  assert.equal(openClaim([]), null);
+  assert.equal(openClaim([row("a", "confirmed"), row("b", "failed"), row("c", "skipped")]), null);
+  assert.equal(openClaim([row("a", "queued"), row("b", "confirmed")])?.id, "a");
+  assert.equal(openClaim([row("a", "failed"), row("b", "sent")])?.id, "b");
+});
+
+test("an open claim is asked about every few seconds, then less often", () => {
+  assert.equal(claimPollDelay(0), 2500);
+  assert.equal(claimPollDelay(59_999), 2500);
+  assert.equal(claimPollDelay(60_000), 10_000);
+  assert.equal(claimPollDelay(599_999), 10_000);
+  assert.equal(claimPollDelay(600_000), 30_000);
+  assert.equal(claimPollDelay(86_400_000), 30_000);
 });

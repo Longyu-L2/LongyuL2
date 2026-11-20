@@ -28,6 +28,7 @@ The network is on public testnet. The contracts have not had an external audit y
 | Bridge | https://testnet.longyu.network/bridge.html |
 | Swap | https://testnet.longyu.network/swap.html |
 | LONGYU MINE | https://mine-testnet.longyu.network |
+| Developers | https://longyu.network/developers |
 
 Contracts on LONGYU testnet:
 
@@ -153,6 +154,63 @@ EXPO_PUBLIC_API_URL=http://localhost:8080 EXPO_PUBLIC_DEV_ATTESTATION=true npx e
 | Block explorer | https://scan-testnet.longyu.network |
 
 Testnet BNB reaches LONGYU through the [bridge](https://testnet.longyu.network/bridge.html) from BSC testnet.
+
+## Building on LONGYU
+
+LONGYU is EVM equivalent, so Foundry, Hardhat and viem work as they do on any EVM chain. Compile for the `cancun` EVM version. The [developer page](https://longyu.network/developers) has the settings, the commands and the addresses of the contracts already on the chain (Multicall3, Permit2, the CREATE2 deployer, the ERC-4337 EntryPoint v0.6, Safe), ready to copy.
+
+A contract's source is published on its explorer page once the explorer has compiled it and found the same code at the address. With Foundry:
+
+```sh
+forge verify-contract <address> src/Token.sol:Token \
+  --chain-id 668801 \
+  --verifier blockscout \
+  --verifier-url https://scan-testnet.longyu.network/api \
+  --watch
+```
+
+With Hardhat 3 and `@nomicfoundation/hardhat-verify`, describe the chain in `hardhat.config.ts` and run `npx hardhat verify --network longyu <address>`:
+
+```ts
+chainDescriptors: {
+  668801: {
+    name: "LONGYU Testnet",
+    blockExplorers: {
+      etherscan: {
+        name: "LONGYU Scan",
+        url: "https://scan-testnet.longyu.network",
+        apiUrl: "https://scan-testnet.longyu.network/api",
+      },
+    },
+  },
+},
+verify: {
+  etherscan: { apiKey: "none" },
+  blockscout: { enabled: false },
+  sourcify: { enabled: false },
+},
+```
+
+With Hardhat 2, the same explorer goes in `etherscan.customChains`, and `apiKey` has to be an object keyed by network name:
+
+```ts
+etherscan: {
+  apiKey: { longyu: "none" },
+  customChains: [
+    {
+      network: "longyu",
+      chainId: 668801,
+      urls: {
+        apiURL: "https://scan-testnet.longyu.network/api",
+        browserURL: "https://scan-testnet.longyu.network",
+      },
+    },
+  ],
+},
+sourcify: { enabled: false },
+```
+
+The explorer needs no API key. There is also a form at https://scan-testnet.longyu.network/verify. How verification is kept safe is in [apps/explorer/README.md](apps/explorer/README.md).
 
 ## Security
 

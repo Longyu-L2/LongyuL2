@@ -1,0 +1,470 @@
+[
+ {
+  "version": "0.8.39",
+  "long": "0.8.39+commit.ce47f2c8",
+  "path": "soljson-v0.8.39+commit.ce47f2c8.js",
+  "sha256": "f0458011dbcd48eb1e8e3311ed92d2c34906e5e55bf516c626b1efaf5d44fa58"
+ },
+ {
+  "version": "0.8.38",
+  "long": "0.8.38+commit.1835d247",
+  "path": "soljson-v0.8.38+commit.1835d247.js",
+  "sha256": "6c74ffba0ea4cf9521e78b16052a98208770bb7677616de08ced239f4312d390"
+ },
+ {
+  "version": "0.8.37",
+  "long": "0.8.37+commit.f401782d",
+  "path": "soljson-v0.8.37+commit.f401782d.js",
+  "sha256": "d73fead3cbc860438f56f4d1723677499cdef212d0f8890241748d2d5afc1c5f"
+ },
+ {
+  "version": "0.8.36",
+  "long": "0.8.36+commit.8a079791",
+  "path": "soljson-v0.8.36+commit.8a079791.js",
+  "sha256": "704877a592467d7de651ec5377ea6e3c676ae71d31f325401957d41bedfaa0d8"
+ },
+ {
+  "version": "0.8.35",
+  "long": "0.8.35+commit.47b9dedd",
+  "path": "soljson-v0.8.35+commit.47b9dedd.js",
+  "sha256": "ecabf2b0bf0c3ab0c6bb9cebd309900bd3b5e80c833d2bc68a330fa5508398f5"
+ },
+ {
+  "version": "0.8.34",
+  "long": "0.8.34+commit.80d5c536",
+  "path": "soljson-v0.8.34+commit.80d5c536.js",
+  "sha256": "c8649f8d57f81b3244c7d2dd662efc0620d1ae296f623b347a2c616a6cfd11d8"
+ },
+ {
+  "version": "0.8.33",
+  "long": "0.8.33+commit.64118f21",
+  "path": "soljson-v0.8.33+commit.64118f21.js",
+  "sha256": "5dd4eecfc699edb05b004b998cb4de7c70c22e94baa0c75881a2192f10ffa7c0"
+ },
+ {
+  "version": "0.8.32",
+  "long": "0.8.32+commit.ebbd65e5",
+  "path": "soljson-v0.8.32+commit.ebbd65e5.js",
+  "sha256": "d9216e6d578f67e1afd54ecb931b9db6a053ff2522d2e21eca3b61b337a9199c"
+ },
+ {
+  "version": "0.8.31",
+  "long": "0.8.31+commit.fd3a2265",
+  "path": "soljson-v0.8.31+commit.fd3a2265.js",
+  "sha256": "3aff685785055588b03e1c0786ee92cada7f4068a65c7aed3a8a868c43253ee0"
+ },
+ {
+  "version": "0.8.30",
+  "long": "0.8.30+commit.73712a01",
+  "path": "soljson-v0.8.30+commit.73712a01.js",
+  "sha256": "81475c98b6d2094a821fd9d7b6278556d8095ccc23e0b8a1029b1c08a89cd4b2"
+ },
+ {
+  "version": "0.8.29",
+  "long": "0.8.29+commit.ab55807c",
+  "path": "soljson-v0.8.29+commit.ab55807c.js",
+  "sha256": "87616a5fc7ab3551f4133bbd2c3e1be123eae219facc2a56f8f3a4366520c67b"
+ },
+ {
+  "version": "0.8.28",
+  "long": "0.8.28+commit.7893614a",
+  "path": "soljson-v0.8.28+commit.7893614a.js",
+  "sha256": "72ef580a6ec5943130028e5294313f24e9435520acc89f8c9dbfd0139d9ae146"
+ },
+ {
+  "version": "0.8.27",
+  "long": "0.8.27+commit.40a35a09",
+  "path": "soljson-v0.8.27+commit.40a35a09.js",
+  "sha256": "d91c08277f801321af4e80958015aea18b41c01d2c6a38310a23014485b0e51c"
+ },
+ {
+  "version": "0.8.26",
+  "long": "0.8.26+commit.8a97fa7a",
+  "path": "soljson-v0.8.26+commit.8a97fa7a.js",
+  "sha256": "db85e5396f523cc1a53c4c4d742e204f6dcba1a05842623d73be946809e11cd6"
+ },
+ {
+  "version": "0.8.25",
+  "long": "0.8.25+commit.b61c2a91",
+  "path": "soljson-v0.8.25+commit.b61c2a91.js",
+  "sha256": "f8c9554471ff2db3843167dffb7a503293b5dc728c8305b044ef9fd37d626ca7"
+ },
+ {
+  "version": "0.8.24",
+  "long": "0.8.24+commit.e11b9ed9",
+  "path": "soljson-v0.8.24+commit.e11b9ed9.js",
+  "sha256": "11b054b55273ec55f6ab3f445eb0eb2c83a23fed43d10079d34ac3eabe6ed8b1"
+ },
+ {
+  "version": "0.8.23",
+  "long": "0.8.23+commit.f704f362",
+  "path": "soljson-v0.8.23+commit.f704f362.js",
+  "sha256": "9c681b165c8647867589c0a5ecdc8692637a935928a2b1bbea2ff4a1f4976985"
+ },
+ {
+  "version": "0.8.22",
+  "long": "0.8.22+commit.4fc1097e",
+  "path": "soljson-v0.8.22+commit.4fc1097e.js",
+  "sha256": "92d283c545395b91a656fa1ec94d567a464bca55aebcdbb99debf42b43026845"
+ },
+ {
+  "version": "0.8.21",
+  "long": "0.8.21+commit.d9974bed",
+  "path": "soljson-v0.8.21+commit.d9974bed.js",
+  "sha256": "45bea352b41d04039e19439962ddef1d3e10cf2bc9526feba39f2cc79e3c5a17"
+ },
+ {
+  "version": "0.8.20",
+  "long": "0.8.20+commit.a1b79de6",
+  "path": "soljson-v0.8.20+commit.a1b79de6.js",
+  "sha256": "5c509f760dc110a695c8b39bbc21e08c17dee431aa14d606f59e623d7c3cc657"
+ },
+ {
+  "version": "0.8.19",
+  "long": "0.8.19+commit.7dd6d404",
+  "path": "soljson-v0.8.19+commit.7dd6d404.js",
+  "sha256": "e0b74e0a16e783a35169f74d1a615ecb48d07c30f97346b83cd587949268681e"
+ },
+ {
+  "version": "0.8.18",
+  "long": "0.8.18+commit.87f61d96",
+  "path": "soljson-v0.8.18+commit.87f61d96.js",
+  "sha256": "d82bdcba2c386d60b33aca148a9cfdf097551f68c5e45d8ec01aebbafacf5075"
+ },
+ {
+  "version": "0.8.17",
+  "long": "0.8.17+commit.8df45f5f",
+  "path": "soljson-v0.8.17+commit.8df45f5f.js",
+  "sha256": "617828e63be485c7cc2dbcbdd5a22b582b40fafaa41016ad595637b83c90656c"
+ },
+ {
+  "version": "0.8.16",
+  "long": "0.8.16+commit.07a7930e",
+  "path": "soljson-v0.8.16+commit.07a7930e.js",
+  "sha256": "27b2820ef93805a65c76b7945a49432582d306fd17a28985709a51e6403677c2"
+ },
+ {
+  "version": "0.8.15",
+  "long": "0.8.15+commit.e14f2714",
+  "path": "soljson-v0.8.15+commit.e14f2714.js",
+  "sha256": "71135e459d691767ce3453bab4564ef4a640dd50182da36517cbc1f96c1d4c7c"
+ },
+ {
+  "version": "0.8.14",
+  "long": "0.8.14+commit.80d49f37",
+  "path": "soljson-v0.8.14+commit.80d49f37.js",
+  "sha256": "7c3b3d0066fd381283b1d8d9a86153b2ddb5c01da14a1ae015c05cfa484e81b6"
+ },
+ {
+  "version": "0.8.13",
+  "long": "0.8.13+commit.abaa5c0e",
+  "path": "soljson-v0.8.13+commit.abaa5c0e.js",
+  "sha256": "387343bcf8f2b77fe4cdcddcaa84361fabf8e1c3508f874fbbcbb9c313542f56"
+ },
+ {
+  "version": "0.8.12",
+  "long": "0.8.12+commit.f00d7308",
+  "path": "soljson-v0.8.12+commit.f00d7308.js",
+  "sha256": "c2c4738c96ad329cbb9baea615ed50ffb5a53d93fed8e00785e47242581d3c60"
+ },
+ {
+  "version": "0.8.11",
+  "long": "0.8.11+commit.d7f03943",
+  "path": "soljson-v0.8.11+commit.d7f03943.js",
+  "sha256": "64117d4b13bfc5bc6e5f80823519b140e753a0c09e99edd756772dc3029bc1f8"
+ },
+ {
+  "version": "0.8.10",
+  "long": "0.8.10+commit.fc410830",
+  "path": "soljson-v0.8.10+commit.fc410830.js",
+  "sha256": "5eaee3240a06891abf5ac70c75caf9a0c33ebe9a2736abdaa22a337f86c22933"
+ },
+ {
+  "version": "0.8.9",
+  "long": "0.8.9+commit.e5eed63a",
+  "path": "soljson-v0.8.9+commit.e5eed63a.js",
+  "sha256": "5b25f987aae32a0275fdc6c1be36cc47cf126024a04dafd8e4be39a1d1d1422c"
+ },
+ {
+  "version": "0.8.8",
+  "long": "0.8.8+commit.dddeac2f",
+  "path": "soljson-v0.8.8+commit.dddeac2f.js",
+  "sha256": "534b7d4079d13bb4cd10b7559dc105c2adec625df4105f20ebce47e6da60bfda"
+ },
+ {
+  "version": "0.8.7",
+  "long": "0.8.7+commit.e28d00a7",
+  "path": "soljson-v0.8.7+commit.e28d00a7.js",
+  "sha256": "663ba99f7c7ee907f0f03227502d48a78256c3c292ace3b79a5d3eb510665306"
+ },
+ {
+  "version": "0.8.6",
+  "long": "0.8.6+commit.11564f7e",
+  "path": "soljson-v0.8.6+commit.11564f7e.js",
+  "sha256": "06a671efd8865a6ecc0ad648076177b35abcd06a7059888ea65111272e33a57f"
+ },
+ {
+  "version": "0.8.5",
+  "long": "0.8.5+commit.a4f2e591",
+  "path": "soljson-v0.8.5+commit.a4f2e591.js",
+  "sha256": "4af595f976235d33a22ffe223e9e3210b4ca510f6a93f153b3daed60f2b11fbc"
+ },
+ {
+  "version": "0.8.4",
+  "long": "0.8.4+commit.c7e474f2",
+  "path": "soljson-v0.8.4+commit.c7e474f2.js",
+  "sha256": "4a14c7bcaf0d988a829db2174b8f7731898aa8633216490603ad74bff64eca3c"
+ },
+ {
+  "version": "0.8.3",
+  "long": "0.8.3+commit.8d00100c",
+  "path": "soljson-v0.8.3+commit.8d00100c.js",
+  "sha256": "b5cedfa8de5f9421fbdaccf9fd5038652c2632344b3b68e5278de81e9aeac210"
+ },
+ {
+  "version": "0.8.2",
+  "long": "0.8.2+commit.661d1103",
+  "path": "soljson-v0.8.2+commit.661d1103.js",
+  "sha256": "015e83fb0b72ccdafb0c217961b21a0321adb2d3f2ad992f5e79635c2086e6dd"
+ },
+ {
+  "version": "0.8.1",
+  "long": "0.8.1+commit.df193b15",
+  "path": "soljson-v0.8.1+commit.df193b15.js",
+  "sha256": "f77f141e5fed9594b28342e2c630ac6d48f2a724e4383a457881acd7fa62b1cf"
+ },
+ {
+  "version": "0.8.0",
+  "long": "0.8.0+commit.c7dfd78e",
+  "path": "soljson-v0.8.0+commit.c7dfd78e.js",
+  "sha256": "c596765f9b3dce486cf596ea35676f37124d54f3ada0fcbc02f094c392066a59"
+ },
+ {
+  "version": "0.7.6",
+  "long": "0.7.6+commit.7338295f",
+  "path": "soljson-v0.7.6+commit.7338295f.js",
+  "sha256": "b94e69dfb056b3e26080f805ab43b668afbc0ac70bf124bfb7391ecfc0172ad2"
+ },
+ {
+  "version": "0.7.5",
+  "long": "0.7.5+commit.eb77ed08",
+  "path": "soljson-v0.7.5+commit.eb77ed08.js",
+  "sha256": "2ee1c6434a32a40b137ac28be12ceeba64701bfad5e80239690803d9c139908e"
+ },
+ {
+  "version": "0.7.4",
+  "long": "0.7.4+commit.3f05b770",
+  "path": "soljson-v0.7.4+commit.3f05b770.js",
+  "sha256": "2b55ed5fec4d9625b6c7b3ab1abd2b7fb7dd2a9c68543bf0323db2c7e2d55af2"
+ },
+ {
+  "version": "0.7.3",
+  "long": "0.7.3+commit.9bfce1f6",
+  "path": "soljson-v0.7.3+commit.9bfce1f6.js",
+  "sha256": "caf4b1f3e01fcf946aad2d22bbe046b9dc4fd50049a05c3458ff239e2c93a785"
+ },
+ {
+  "version": "0.7.2",
+  "long": "0.7.2+commit.51b20bc0",
+  "path": "soljson-v0.7.2+commit.51b20bc0.js",
+  "sha256": "dfa3f2bb4589bdc9c054292173c82ee70e65af8d1971598f6e13b9b79ba94185"
+ },
+ {
+  "version": "0.7.1",
+  "long": "0.7.1+commit.f4a555be",
+  "path": "soljson-v0.7.1+commit.f4a555be.js",
+  "sha256": "7fcc983c5149840a47b946fc51fc14f1c21cda07c01d650e4a1f814319cb1423"
+ },
+ {
+  "version": "0.7.0",
+  "long": "0.7.0+commit.9e61f92b",
+  "path": "soljson-v0.7.0+commit.9e61f92b.js",
+  "sha256": "e7e1be3d0a67469f6a37cd676a22314c4faa8a22ff9d5ebde11302db754453eb"
+ },
+ {
+  "version": "0.6.12",
+  "long": "0.6.12+commit.27d51765",
+  "path": "soljson-v0.6.12+commit.27d51765.js",
+  "sha256": "3e1956c550ca48e289044c7c0bd892403081b4b5e17e77ce707c815ce6c4228f"
+ },
+ {
+  "version": "0.6.11",
+  "long": "0.6.11+commit.5ef660b1",
+  "path": "soljson-v0.6.11+commit.5ef660b1.js",
+  "sha256": "9778e4a7667d5fd7632caf3ef3791d390a7cc217f94f96e919a31e3be332386a"
+ },
+ {
+  "version": "0.6.10",
+  "long": "0.6.10+commit.00c0fcaf",
+  "path": "soljson-v0.6.10+commit.00c0fcaf.js",
+  "sha256": "fa27ce9d23bddaa76a4aefbafa48e48affde9a1ee7c8a5e8784cf8d4c390f655"
+ },
+ {
+  "version": "0.6.9",
+  "long": "0.6.9+commit.3e3065ac",
+  "path": "soljson-v0.6.9+commit.3e3065ac.js",
+  "sha256": "f1724fd46b7a353561b3f8d473b0dc8c855b6d84b5af559d7e3326ac79b9d758"
+ },
+ {
+  "version": "0.6.8",
+  "long": "0.6.8+commit.0bbfe453",
+  "path": "soljson-v0.6.8+commit.0bbfe453.js",
+  "sha256": "3e8b01cbd194e40971b41017ada7c8b2fa941b0458cb701bdfb6a82257ca971b"
+ },
+ {
+  "version": "0.6.7",
+  "long": "0.6.7+commit.b8d736ae",
+  "path": "soljson-v0.6.7+commit.b8d736ae.js",
+  "sha256": "b795f1b20f065a0aee492c24071fc1efa1633c3caab77cff20278a9ae822f04e"
+ },
+ {
+  "version": "0.6.6",
+  "long": "0.6.6+commit.6c089d02",
+  "path": "soljson-v0.6.6+commit.6c089d02.js",
+  "sha256": "09f6098026622c5c334c7798c3ad2b8f7c0ebc62f87846c7d5e7e725c3d1cbc2"
+ },
+ {
+  "version": "0.6.5",
+  "long": "0.6.5+commit.f956cc89",
+  "path": "soljson-v0.6.5+commit.f956cc89.js",
+  "sha256": "f8f83757e73f33f44389d1fa72d013fb266454a8dd9bb6897c7776f8fc3b0231"
+ },
+ {
+  "version": "0.6.4",
+  "long": "0.6.4+commit.1dca32f3",
+  "path": "soljson-v0.6.4+commit.1dca32f3.js",
+  "sha256": "a4fd5bb021259cdde001b03dac0e66353a3b066b47eb2476acb58b2610a224ca"
+ },
+ {
+  "version": "0.6.3",
+  "long": "0.6.3+commit.8dda9521",
+  "path": "soljson-v0.6.3+commit.8dda9521.js",
+  "sha256": "f89514dedd8cfb3c4d351580ff80b8444acde702f8be0e5fad710fe6e906c687"
+ },
+ {
+  "version": "0.6.2",
+  "long": "0.6.2+commit.bacdbe57",
+  "path": "soljson-v0.6.2+commit.bacdbe57.js",
+  "sha256": "25f564cbecc5bfe95d6d358e0e7543c31ece0ab1332c555ff323ca163711bd2b"
+ },
+ {
+  "version": "0.6.1",
+  "long": "0.6.1+commit.e6f7d5a4",
+  "path": "soljson-v0.6.1+commit.e6f7d5a4.js",
+  "sha256": "3628fdefd6971ea9cc16acbf91e5f6d6cfb2079181784b47e4d24f4c5d92e4e4"
+ },
+ {
+  "version": "0.6.0",
+  "long": "0.6.0+commit.26b70077",
+  "path": "soljson-v0.6.0+commit.26b70077.js",
+  "sha256": "f22c63511a85230f7640ff5a77433db643d8d32be8b7c7f1dc24c1301a5158e9"
+ },
+ {
+  "version": "0.5.17",
+  "long": "0.5.17+commit.d19bba13",
+  "path": "soljson-v0.5.17+commit.d19bba13.js",
+  "sha256": "7fd1d3f1fddc615e117f7fb7586acabd60c649c390cf110c8fdc5ce159fa5734"
+ },
+ {
+  "version": "0.5.16",
+  "long": "0.5.16+commit.9c3226ce",
+  "path": "soljson-v0.5.16+commit.9c3226ce.js",
+  "sha256": "a09c9cc2672678d461dc71100600bb58802db87be4de9424769241712ccbec03"
+ },
+ {
+  "version": "0.5.15",
+  "long": "0.5.15+commit.6a57276f",
+  "path": "soljson-v0.5.15+commit.6a57276f.js",
+  "sha256": "0d34e4ed048bbf67daacdf36cd5ce0f553a32962967b52edab6afccaa071878b"
+ },
+ {
+  "version": "0.5.14",
+  "long": "0.5.14+commit.01f1aaa4",
+  "path": "soljson-v0.5.14+commit.01f1aaa4.js",
+  "sha256": "43b85bc9941814b018065da5c6c8d40e2af49264d0d1f06bdefbfbe628e65ff8"
+ },
+ {
+  "version": "0.5.13",
+  "long": "0.5.13+commit.5b0b510c",
+  "path": "soljson-v0.5.13+commit.5b0b510c.js",
+  "sha256": "6e095eefc48dfc21fec18d0b63f229e929f881b5d6e8a999e1622c6b707a7f54"
+ },
+ {
+  "version": "0.5.12",
+  "long": "0.5.12+commit.7709ece9",
+  "path": "soljson-v0.5.12+commit.7709ece9.js",
+  "sha256": "1784f89fcfffccddaa94273a58e452682f61dea05d142406775f099c6ef5d61f"
+ },
+ {
+  "version": "0.5.11",
+  "long": "0.5.11+commit.c082d0b4",
+  "path": "soljson-v0.5.11+commit.c082d0b4.js",
+  "sha256": "89978dcef86244b8e7af95298abe26aaf4825df819d6c556e4323dc152c988ad"
+ },
+ {
+  "version": "0.5.10",
+  "long": "0.5.10+commit.5a6ea5b1",
+  "path": "soljson-v0.5.10+commit.5a6ea5b1.js",
+  "sha256": "566601442deff058d393359df59ed72b41e1f6a65b0aa371fab7f903c189b59d"
+ },
+ {
+  "version": "0.5.9",
+  "long": "0.5.9+commit.e560f70d",
+  "path": "soljson-v0.5.9+commit.e560f70d.js",
+  "sha256": "7d40c6325c0aa4635babdb8913626b7c4bac6a4f41e1c383de5f398e1fc98e1b"
+ },
+ {
+  "version": "0.5.8",
+  "long": "0.5.8+commit.23d335f2",
+  "path": "soljson-v0.5.8+commit.23d335f2.js",
+  "sha256": "25cfdd733e9c780ab85373268fde7bfa2e4b22093af57422ca3b586c7af7cd60"
+ },
+ {
+  "version": "0.5.7",
+  "long": "0.5.7+commit.6da8b019",
+  "path": "soljson-v0.5.7+commit.6da8b019.js",
+  "sha256": "fd7c4e652d5891c84d93b28c90b8ac58c9253d2a3677935883a337ee96087b8f"
+ },
+ {
+  "version": "0.5.6",
+  "long": "0.5.6+commit.b259423e",
+  "path": "soljson-v0.5.6+commit.b259423e.js",
+  "sha256": "9ffc04d0aee2c817ae6a897b1ba5aaca2bcd860416aaddfaa4de553fc1ad6e8e"
+ },
+ {
+  "version": "0.5.5",
+  "long": "0.5.5+commit.47a71e8f",
+  "path": "soljson-v0.5.5+commit.47a71e8f.js",
+  "sha256": "af812445476c101ae5ef92941c79eaebf57b39d455bdfb54a6a86b4ab6ca498c"
+ },
+ {
+  "version": "0.5.4",
+  "long": "0.5.4+commit.9549d8ff",
+  "path": "soljson-v0.5.4+commit.9549d8ff.js",
+  "sha256": "91ed0cf4390f33174a4aaf49d1ce7cd9c72e28b95d2f9422314a29b2144b2042"
+ },
+ {
+  "version": "0.5.3",
+  "long": "0.5.3+commit.10d17f24",
+  "path": "soljson-v0.5.3+commit.10d17f24.js",
+  "sha256": "24b4cbc28d68bde8455c14a46b55e4f292c3c295271e09991b2176a487cb4487"
+ },
+ {
+  "version": "0.5.2",
+  "long": "0.5.2+commit.1df8f40c",
+  "path": "soljson-v0.5.2+commit.1df8f40c.js",
+  "sha256": "aff4ca62ac0b03cb4b9c50f8250e2e7307b5c75fefc9847f269bd05c20367148"
+ },
+ {
+  "version": "0.5.1",
+  "long": "0.5.1+commit.c8a2cb62",
+  "path": "soljson-v0.5.1+commit.c8a2cb62.js",
+  "sha256": "69cb1300b5f72eb128604507991d9ada97180d31afde7c59aa3fa3ae9ad5200d"
+ },
+ {
+  "version": "0.5.0",
+  "long": "0.5.0+commit.1d4f565a",
+  "path": "soljson-v0.5.0+commit.1d4f565a.js",
+  "sha256": "af811843add541705ff65f0c20fd864bd0387116544524fa1830cf67a14af6c4"
+ }
+]

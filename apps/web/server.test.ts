@@ -185,6 +185,8 @@ test("the landing page has names of its own, which serve it and nothing of the p
   const landingBuilt: Record<string, string> = {
     ...built,
     "landing.html": '<!doctype html><title>landing</title><link rel="preload" href="./Inter-SemiBold.woff2" as="font" /><style>@font-face { src: url("./Inter-SemiBold.woff2") format("woff2"); } .x { background: url("./other.png"); }</style><img src="./lockup.svg" /><a href="./">home</a><script type="module" src="./landing.js"></script>',
+    "developers.html": '<!doctype html><title>developers</title><img src="./lockup.svg" /><a href="./">home</a><a href="./developers">here</a><script type="module" src="./developers.js"></script>',
+    "developers.js": "console.log('developers');".repeat(200),
     "landing.js": "console.log('landing');".repeat(200), "lockup.svg": '<svg xmlns="http://www.w3.org/2000/svg"><title>lockup</title></svg>', "share.png": "png bytes ".repeat(100),
     "Inter-Regular.woff2": "regular ".repeat(100), "Inter-SemiBold.woff2": "semibold ".repeat(100), "Sora-SemiBold.woff2": "sora ".repeat(100), "JetBrainsMono-Medium.woff2": "mono ".repeat(100),
     "OFL.txt": "SIL OPEN FONT LICENSE Version 1.1",
@@ -225,6 +227,14 @@ test("the landing page has names of its own, which serve it and nothing of the p
   assert.match(page.body, /src="\.\/lockup\.svg\?v=[0-9a-f]{12}"/);
   assert.match(page.body, /src="\.\/landing\.js\?v=[0-9a-f]{12}"/);
 
+  // The developer page has a path of its own, and its script is named by its content like the landing page's.
+  const guide = await ask("longyu.network", "/developers");
+  assert.deepEqual([guide.status, guide.type, guide.cache], [200, "text/html; charset=utf-8", "no-cache"]);
+  assert.ok(guide.body.includes("<title>developers</title>") && guide.body.includes('href="./developers"') && guide.body.includes('src="./developers.js?v='));
+  assert.equal((await ask("longyu.network", "/developers.html")).body, guide.body);
+  assert.equal((await ask("longyu.network", "/developers.js", "br")).encoding, "br");
+  for (const near of ["/developers/", "/Developers", "/developer"]) assert.equal((await ask("longyu.network", near)).status, 404, near);
+
   const pinned = await ask("longyu.network", `/Inter-SemiBold.woff2?v=${font}`, "gzip, deflate, br");
   assert.deepEqual([pinned.status, pinned.type, pinned.encoding, pinned.cache], [200, "font/woff2", undefined, "public, max-age=31536000, immutable"]);
   assert.equal(pinned.body, landingBuilt["Inter-SemiBold.woff2"]);
@@ -240,7 +250,7 @@ test("the landing page has names of its own, which serve it and nothing of the p
   const claim = await ask("testnet.longyu.network", "/");
   assert.equal(claim.body, built["index.html"]);
   assert.equal((await ask("testnet.longyu.network", "/bridge.html")).status, 200);
-  for (const other of ["/landing.html", "/landing.js", "/lockup.svg", "/share.png", "/Inter-Regular.woff2", "/OFL.txt"]) assert.equal((await ask("testnet.longyu.network", other)).status, 404, other);
+  for (const other of ["/landing.html", "/landing.js", "/developers", "/developers.html", "/developers.js", "/lockup.svg", "/share.png", "/Inter-Regular.woff2", "/OFL.txt"]) assert.equal((await ask("testnet.longyu.network", other)).status, 404, other);
   // And www goes to the landing page's name.
   const www = await ask("www.longyu.network", "/?ref=x");
   assert.deepEqual([www.status, www.location], [302, "https://longyu.network/?ref=x"]);
@@ -251,5 +261,6 @@ test("the landing page has names of its own, which serve it and nothing of the p
   await new Promise<void>((r) => plain.listen(0, "127.0.0.1", r));
   const plainUrl = `http://127.0.0.1:${(plain.address() as AddressInfo).port}`;
   assert.equal((await fetch(`${plainUrl}/landing.html`)).status, 404);
+  assert.equal((await fetch(`${plainUrl}/developers`)).status, 404);
   assert.equal(await (await fetch(`${plainUrl}/`)).text(), built["index.html"]);
 });

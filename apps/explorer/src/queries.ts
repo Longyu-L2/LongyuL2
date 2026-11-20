@@ -367,4 +367,47 @@ export async function searchTokens(q: Queryable, text: string, limit = 10) {
   )).rows;
 }
 
+/** A contract whose source was published and matched (verify/). */
+export interface VerifiedRow {
+  address: string;
+  name: string;
+  file: string;
+  compiler: string;
+  optimizer: boolean;
+  runs: bigint | null;
+  evm_version: string | null;
+  match_kind: "full" | "partial";
+  creation_checked: boolean;
+  constructor_args: string | null;
+  abi: string;
+  input: string;
+  code_hash: string;
+  verified_at: bigint;
+}
+
+export async function verified(q: Queryable, address: string): Promise<VerifiedRow | null> {
+  return (await q.query<VerifiedRow>("SELECT * FROM verified_contracts WHERE address = $1", [address])).rows[0] ?? null;
+}
+
+/** What a verification may replace: nothing at all, or a partial match when it is a full one. Returns whether the row was written. */
+export async function saveVerified(q: Queryable, v: VerifiedRow): Promise<boolean> {
+  const written = await q.query<{ address: string }>(
+    `INSERT INTO verified_contracts (address, name, file, compiler, optimizer, runs, evm_version, match_kind, creation_checked, constructor_args, abi, input, code_hash, verified_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+     ON CONFLICT (address) DO UPDATE SET name = EXCLUDED.name, file = EXCLUDED.file, compiler = EXCLUDED.compiler, optimizer = EXCLUDED.optimizer, runs = EXCLUDED.runs,
+       evm_version = EXCLUDED.evm_version, match_kind = EXCLUDED.match_kind, creation_checked = EXCLUDED.creation_checked, constructor_args = EXCLUDED.constructor_args,
+       abi = EXCLUDED.abi, input = EXCLUDED.input, code_hash = EXCLUDED.code_hash, verified_at = EXCLUDED.verified_at
+     WHERE verified_contracts.code_hash <> EXCLUDED.code_hash OR (verified_contracts.match_kind = 'partial' AND EXCLUDED.match_kind = 'full')
+     RETURNING address`,
+    [v.address, v.name, v.file, v.compiler, v.optimizer, v.runs === null ? null : v.runs.toString(), v.evm_version, v.match_kind, v.creation_checked, v.constructor_args, v.abi, v.input, v.code_hash, v.verified_at.toString()],
+  );
+  return written.rows.length === 1;
+}
+
+/** Bytes of source and ABI taken in since a time (seconds), for the limit on what a day may add. */
+export async function verifiedBytesSince(q: Queryable, since: bigint): Promise<bigint> {
+  const row = (await q.query<{ bytes: bigint | string }>("SELECT COALESCE(SUM(OCTET_LENGTH(input) + OCTET_LENGTH(abi)), 0) AS bytes FROM verified_contracts WHERE verified_at >= $1", [since.toString()])).rows[0];
+  return BigInt(row?.bytes ?? 0);
+}
+
 export { MESSAGE_PASSER, TRANSFER_TOPIC };

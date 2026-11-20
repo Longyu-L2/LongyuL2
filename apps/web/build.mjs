@@ -28,12 +28,15 @@
 // swap and Safe pages may send requests to those addresses and to no other. One that is set and is not an
 // https address (http only on localhost) stops the build.
 //
-// The landing page (src/landing.html, served on the names in the server's LANDING_HOSTS) links to everything
-// else, so it is built only when all of these are set: SITE_URL, APP_URL, MINE_URL, EXPLORER_URL, L2_RPC_URL
-// and CHAIN_ID. It reads the block height at L2_RPC_URL and sends requests nowhere else.
+// The landing page (src/landing.html) and the developer page (src/developers.html), served on the names in
+// the server's LANDING_HOSTS, link to everything else, so they are built only when all of these are set:
+// SITE_URL, APP_URL, MINE_URL, EXPLORER_URL, L2_RPC_URL and CHAIN_ID. The landing page reads the block height
+// at L2_RPC_URL and sends requests nowhere else; the developer page sends none.
 //   SITE_URL            The landing page's own address, https://longyu.network
 //   APP_URL             These pages' address, https://testnet.longyu.network
 //   GITHUB_URL, X_URL   Links that show only when they are set (optional)
+// The developer page lists L2_TOKEN, SWAP_ROUTER, SWAP_FACTORY, L1_STANDARD_BRIDGE, L1_PORTAL and L1_TOKEN,
+// each only when it is set.
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -53,6 +56,8 @@ const CONTACTS = {
   "swap.html": ["L2_RPC_URL"],
   "safe.html": ["L2_RPC_URL", "L1_RPC_URL"],
   "landing.html": ["L2_RPC_URL"],
+  // It hands the network to a wallet and copies text: nothing leaves the page.
+  "developers.html": [],
 };
 
 // As a page's policy has it before the build narrows it.
@@ -104,6 +109,8 @@ export function publishedPage(page, html, settings) {
 const LANDING_SITES = ["SITE_URL", "APP_URL", "MINE_URL", "EXPLORER_URL"];
 // Links the landing page shows only when they are set.
 const LANDING_LINKS = ["GITHUB_URL", "X_URL"];
+// Contract addresses the developer page lists, each only when it is set.
+const LANDING_ADDRESSES = ["L2_TOKEN", "SWAP_ROUTER", "SWAP_FACTORY", "L1_STANDARD_BRIDGE", "L1_PORTAL", "L1_TOKEN"];
 
 const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -121,12 +128,12 @@ function httpsAddress(name, value, site) {
 }
 
 /**
- * The landing page with the build's addresses written into it, or null when one it cannot do without
- * is not set. A line marked data-optional="GITHUB_URL" is left out when that link is not set. A value
- * that is set and is not what the page can use throws, and so does a name the page asks for that the
- * build does not know.
+ * The landing page, or the developer page, with the build's addresses written into it, or null when
+ * one it cannot do without is not set. A line marked data-optional="GITHUB_URL" is left out when that
+ * link is not set. A value that is set and is not what the page can use throws, and so does a name
+ * the page asks for that the build does not know.
  */
-export function landingPage(html, settings) {
+export function landingPage(html, settings, page = "landing.html") {
   const setting = (name) => (settings[name] ?? "").trim();
   if ([...LANDING_SITES, "L2_RPC_URL", "CHAIN_ID"].some((name) => !setting(name))) return null;
   const values = { CHAIN_NAME: setting("CHAIN_NAME") || "LONGYU Testnet", NATIVE_SYMBOL: setting("NATIVE_SYMBOL") || "tBNB" };
@@ -136,15 +143,21 @@ export function landingPage(html, settings) {
   if (!/^[1-9][0-9]{0,15}$/.test(setting("CHAIN_ID"))) throw new Error("CHAIN_ID must be a whole number");
   values.CHAIN_ID = setting("CHAIN_ID");
   for (const name of LANDING_LINKS) if (setting(name)) values[name] = httpsAddress(name, setting(name), false);
+  for (const name of LANDING_ADDRESSES) {
+    if (!setting(name)) continue;
+    if (!/^0x[0-9a-fA-F]{40}$/.test(setting(name))) throw new Error(`${name} must be a contract address`);
+    values[name] = setting(name);
+  }
+  const optionals = [...LANDING_LINKS, ...LANDING_ADDRESSES];
   const lines = [];
   for (const line of html.split("\n")) {
     const optional = / data-optional="([A-Z0-9_]+)"/.exec(line);
     if (!optional) lines.push(line);
-    else if (!LANDING_LINKS.includes(optional[1])) throw new Error(`landing.html: ${optional[1]} is not an optional link`);
+    else if (!optionals.includes(optional[1])) throw new Error(`${page}: ${optional[1]} is not an optional value`);
     else if (Object.hasOwn(values, optional[1])) lines.push(line.replace(optional[0], ""));
   }
   return lines.join("\n").replace(/\{\{([A-Z0-9_]+)\}\}/g, (whole, name) => {
-    if (!Object.hasOwn(values, name)) throw new Error(`landing.html: no value for ${name}`);
+    if (!Object.hasOwn(values, name)) throw new Error(`${page}: no value for ${name}`);
     return escapeHtml(values[name]);
   });
 }
@@ -155,7 +168,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   // Before anything is bundled: a bad address stops the build here.
   const settings = { API_URL: apiUrl, L2_RPC_URL: env("L2_RPC_URL"), L1_RPC_URL: env("L1_RPC_URL") };
   const pages = PAGES.map((page) => [page, publishedPage(page, readFileSync(`src/${page}`, "utf8"), settings)]);
-  const landing = landingPage(readFileSync("src/landing.html", "utf8"), {
+  const landingSettings = {
     ...settings,
     SITE_URL: env("SITE_URL"),
     APP_URL: env("APP_URL"),
@@ -166,11 +179,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     NATIVE_SYMBOL: env("NATIVE_SYMBOL"),
     GITHUB_URL: env("GITHUB_URL"),
     X_URL: env("X_URL"),
-  });
-  if (landing !== null) pages.push(["landing.html", publishedPage("landing.html", landing, settings)]);
+    L2_TOKEN: env("L2_TOKEN"),
+    SWAP_ROUTER: env("SWAP_ROUTER"),
+    SWAP_FACTORY: env("SWAP_FACTORY"),
+    L1_STANDARD_BRIDGE: env("L1_STANDARD_BRIDGE"),
+    L1_PORTAL: env("L1_PORTAL"),
+    L1_TOKEN: env("L1_TOKEN"),
+  };
+  const landing = landingPage(readFileSync("src/landing.html", "utf8"), landingSettings);
+  if (landing !== null) {
+    pages.push(["landing.html", publishedPage("landing.html", landing, settings)]);
+    const developers = landingPage(readFileSync("src/developers.html", "utf8"), landingSettings, "developers.html");
+    pages.push(["developers.html", publishedPage("developers.html", developers, settings)]);
+  }
   mkdirSync("dist", { recursive: true });
   await build({
-    entryPoints: { main: "src/main.ts", pay: "src/pay.ts", bridge: "src/bridge.ts", swap: "src/swap.ts", safe: "src/safe.ts", ...(landing === null ? {} : { landing: "src/landing.ts" }) },
+    entryPoints: { main: "src/main.ts", pay: "src/pay.ts", bridge: "src/bridge.ts", swap: "src/swap.ts", safe: "src/safe.ts", ...(landing === null ? {} : { landing: "src/landing.ts", developers: "src/developers.ts" }) },
     bundle: true,
     minify: true,
     format: "esm",
@@ -236,5 +260,5 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     // The fonts, and the licence they are published under.
     for (const name of readdirSync("src/fonts")) if (/\.woff2$|^OFL\.txt$/.test(name)) copyFileSync(`src/fonts/${name}`, `dist/${name}`);
   }
-  console.log(landing === null ? "built dist/ (without the landing page: its addresses are not all set)" : "built dist/");
+  console.log(landing === null ? "built dist/ (without the landing and developer pages: their addresses are not all set)" : "built dist/");
 }

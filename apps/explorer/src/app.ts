@@ -1,6 +1,7 @@
 /**
  * LONGYU Scan's web server: pages, the JSON API, an Etherscan-compatible API and static files.
- * Read-only: nothing here writes to the chain or to the database.
+ * Nothing here writes to the chain. The one thing a visitor can add to the database is a contract's
+ * source, and only after the explorer has compiled it and found the contract's own bytecode (verify/).
  */
 import { createHash, timingSafeEqual } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
@@ -9,6 +10,7 @@ import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import rateLimit from "@fastify/rate-limit";
+import { keccak256 } from "viem";
 import type { Config } from "./config.ts";
 import type { Db, Queryable } from "./db.ts";
 import { bridgedToken, decodeCall, decodeLog, methodName, PREDEPLOYS } from "./decode.ts";
@@ -16,6 +18,10 @@ import { isSystemTx } from "./indexer.ts";
 import * as Q from "./queries.ts";
 import { hex, type Hex, type RawBlock, type RawReceipt, type RawTx, type Rpc } from "./rpc.ts";
 import { cleanText, totalSupply } from "./tokens.ts";
+import { isolatedCompiler, LIMITS, type Compile } from "./verify/compile.ts";
+import { CompilerStore, type CompilerBuild } from "./verify/compilers.ts";
+import { Verifier } from "./verify/service.ts";
+import { verifyPage, verifyStatusPage, type VerifyForm } from "./web/verify.ts";
 import { addressPage, apiDocsPage, blockPage, blocksPage, bridgePage, CHART_DAYS, HOME_ROWS, homePage, layout, notFoundPage, PAGE_SIZE, searchPage, tokenPage, tokensPage, txPage, txsPage, type Site } from "./web/pages.ts";
 import { addressPath, blockPath, isAddress, isHash, tokenPath, txPath } from "./web/html.ts";
 
@@ -23,6 +29,8 @@ export interface AppDeps {
   db: Db;
   rpc: Rpc;
   config: Config;
+  /** Stand-ins for the compiler and its download, for tests. */
+  verify?: { compile?: Compile; loadCompiler?: (build: CompilerBuild) => Promise<Buffer> };
 }
 
 const PUBLIC = fileURLToPath(new URL("../public/", import.meta.url));
@@ -72,6 +80,7 @@ export function siteOf(config: Config, build = ""): Site {
     websiteUrl: config.WEBSITE_URL ?? null,
     mineUrl: config.MINE_URL ?? null,
     githubUrl: config.GITHUB_URL ?? null,
+    verification: config.VERIFICATION,
     labels,
     build,
   };
@@ -101,6 +110,29 @@ const normHash = (s: string) => (/^0x[0-9a-fA-F]{64}$/.test(s) ? s.toLowerCase()
 const QUERY_TIMEOUT_MS = 5_000;
 /** Most transactions in a page of the Etherscan-compatible txlist: each can carry Q.DATA_BYTES bytes of calldata. */
 const TXLIST_ROWS = 100;
+/** The largest verification request: a project's sources in one standard JSON input, sent as a form. */
+const VERIFY_BODY_BYTES = 4 * 1024 * 1024;
+/** A request body past this size is counted as an upload of source. */
+const SMALL_BODY_BYTES = 2048;
+/** Per visitor, each minute: uploads of source, verifications asked for, and readings of a verified source. */
+const UPLOADS_A_MINUTE = 6;
+const SOURCE_READS_A_MINUTE = 30;
+
+/** Counts by key within a window; false once a key has had its share. */
+function limiter(max: number, windowMs: number): (key: string) => boolean {
+  const seen = new Map<string, { n: number; until: number }>();
+  return (key) => {
+    const now = Date.now();
+    if (seen.size >= 20_000) for (const [k, v] of seen) if (v.until <= now) seen.delete(k);
+    if (seen.size >= 20_000) seen.clear();
+    const has = seen.get(key);
+    if (!has || has.until <= now) {
+      seen.set(key, { n: 1, until: now + windowMs });
+      return true;
+    }
+    return ++has.n <= max;
+  };
+}
 
 /**
  * The address a rate limit counts by: an IPv4 address as it is, an IPv6 address by its /64 network
@@ -147,6 +179,10 @@ function held<K, T>(ms: number, read: (key: K) => Promise<T>): (key: K) => Promi
   };
 }
 
+/** The fields the Etherscan-compatible API reads outside its contract module, and those of the verification form. */
+const ETHERSCAN_FIELDS = ["module", "action", "address", "contractaddress", "page", "offset", "sort", "startblock", "endblock"] as const;
+const VERIFY_FIELDS = ["contractaddress", "compilerversion", "codeformat", "contractname", "optimizationUsed", "runs", "evmversion", "viaIR", "sourceCode"] as const;
+
 export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const { rpc, config } = deps;
   // Everything here reads on a visitor's behalf; the indexer keeps the connections that have no limit.
@@ -156,6 +192,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const trustProxy = config.TRUST_PROXY === "false" ? false : config.TRUST_PROXY.split(",").map((s) => s.trim());
   const app = Fastify({ logger: config.NODE_ENV === "production" ? { level: "info" } : false, trustProxy, bodyLimit: 1024 });
 
+  // Verification requests come as forms: Etherscan's API as Foundry and Hardhat speak it, and the page's own form.
+  app.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "string" }, (_req, body, done) => done(null, new URLSearchParams(body as string)));
   app.setReplySerializer((payload) => JSON.stringify(payload, (_, v) => (typeof v === "bigint" ? v.toString() : v)));
   // Behind Cloudflare on a host whose origin is public (Railway), only requests carrying the secret
   // Cloudflare adds are served; anything else reached the origin directly and could name any visitor.
@@ -195,6 +233,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   const page = (reply: FastifyReply, title: string, body: Parameters<typeof layout>[2], active = "", status = 200) =>
     reply.code(status).header("cache-control", status === 200 ? "public, max-age=2" : "no-store").type("text/html; charset=utf-8").send(layout(site, title, body, active));
+  /** A page that is one visitor's own, such as the state of their verification. */
+  const fresh = (reply: FastifyReply, title: string, body: Parameters<typeof layout>[2], status = 200, refresh?: number) =>
+    reply.code(status).header("cache-control", "no-store").type("text/html; charset=utf-8").send(layout(site, title, body, "", refresh));
   const notFound = (reply: FastifyReply, what: string) => page(reply, "Not found", notFoundPage(what), "", 404);
   const head = async () => (await db.query<{ number: bigint }>("SELECT number FROM blocks ORDER BY number DESC LIMIT 1")).rows[0]?.number ?? null;
 
@@ -242,6 +283,60 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     return key ? (await Q.block(db, key)) ?? nodeBlock(key) : null;
   };
   const txByHash = async (hash: string): Promise<Q.TxRow | null> => (await Q.tx(db, hash)) ?? nodeSystemTx(hash);
+
+  // ---------------------------------------------------------- verification
+  const compilers = deps.verify?.loadCompiler ? null : new CompilerStore(config.COMPILER_CACHE_DIR);
+  const compiling = new Set<() => void>();
+  const verifier = config.VERIFICATION
+    ? new Verifier({
+        db,
+        rpc,
+        loadCompiler: deps.verify?.loadCompiler ?? ((build) => compilers!.load(build)),
+        compile: deps.verify?.compile ?? isolatedCompiler(LIMITS, (kill) => {
+          compiling.add(kill);
+          return () => void compiling.delete(kill);
+        }),
+        dailyBytes: config.VERIFY_DAILY_BYTES,
+        log: (m) => app.log.warn(m),
+      })
+    : null;
+  app.addHook("onClose", async () => {
+    verifier?.close();
+    for (const kill of compiling) kill();
+  });
+  const OFF = "Contract verification is switched off for now";
+  const uploads = limiter(UPLOADS_A_MINUTE, 60_000);
+  const submits = limiter(UPLOADS_A_MINUTE, 60_000);
+  const sourceReads = limiter(SOURCE_READS_A_MINUTE, 60_000);
+  const tooMany = (reply: FastifyReply) => reply.code(429).header("retry-after", "60").header("cache-control", "no-store").send({ status: "0", message: "NOTOK", result: "Max rate limit reached" });
+  /** Before a body is read: a visitor who keeps sending large ones is refused without reading theirs. */
+  const beforeUpload = async (req: FastifyRequest, reply: FastifyReply) => {
+    const length = Number(req.headers["content-length"]);
+    if (Number.isFinite(length) && length <= SMALL_BODY_BYTES) return;
+    if (uploads(visitor(req))) return;
+    if (req.url.startsWith("/verify")) return page(reply, "Too many requests", notFoundPage("Try again in a minute.", "Too many requests"), "", 429);
+    return tooMany(reply);
+  };
+  /** A request's named fields: the form it posted, then its query. Only text counts. */
+  const fields = (req: FastifyRequest): ((name: string) => string | undefined) => {
+    const query = req.query as Record<string, unknown>;
+    const body = req.method === "POST" ? req.body : null;
+    return (name) => {
+      const sent = body instanceof URLSearchParams ? body.get(name) : body && typeof body === "object" && Object.hasOwn(body, name) ? (body as Record<string, unknown>)[name] : null;
+      if (typeof sent === "string") return sent;
+      return Object.hasOwn(query, name) && typeof query[name] === "string" ? (query[name] as string) : undefined;
+    };
+  };
+  /**
+   * A contract's verified source, for as long as the address holds the code it was matched against.
+   * `code` is the address's code when the caller has just read it.
+   */
+  const verifiedSource = async (address: string, code?: Hex): Promise<Q.VerifiedRow | null> => {
+    const v = await Q.verified(db, address);
+    if (!v) return null;
+    const now = code ?? (await rpc.call<Hex>("eth_getCode", [address, "latest"]));
+    return typeof now === "string" && now !== "0x" && keccak256(now.toLowerCase() as Hex) === v.code_hash ? v : null;
+  };
 
   // ---------------------------------------------------------------- static
   app.get("/static/*", async (req, reply) => {
@@ -326,8 +421,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   app.get("/address/:address", async (req, reply) => {
     const a = normAddress((req.params as { address: string }).address);
     if (!a) return notFound(reply, "That is not an address.");
-    const query = req.query as { tab?: string };
-    const tab = query.tab === "transfers" || query.tab === "tokens" ? query.tab : "txs";
+    const query = req.query as { tab?: string; file?: string };
+    const tab = query.tab === "transfers" || query.tab === "tokens" || query.tab === "contract" ? query.tab : "txs";
     const p = pageOf(req.query);
     const [balance, code, txCount, creation, token, holdings] = await Promise.all([
       rpc.call<Hex>("eth_getBalance", [a, "latest"]).then((h) => BigInt(h)).catch(() => null),
@@ -339,8 +434,14 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     ]);
     const txs = tab === "txs" ? await Q.addressTxs(db, a, PAGE_SIZE, (p - 1) * PAGE_SIZE) : [];
     const transfers = tab === "transfers" ? await Q.addressTransfers(db, a, PAGE_SIZE, (p - 1) * PAGE_SIZE) : [];
+    // A source is long: the tab that shows one has a limit of its own.
+    if (tab === "contract" && !sourceReads(visitor(req))) return page(reply, "Too many requests", notFoundPage("Try again in a minute.", "Too many requests"), "", 429);
+    const hasCode = code !== "0x";
+    const source = hasCode ? await verifiedSource(a, code) : null;
+    const file = typeof query.file === "string" && /^\d{1,4}$/.test(query.file) ? Number(query.file) : null;
     return page(reply, `Address ${a.slice(0, 10)}`, addressPage(site, a, {
-      balance, isContract: code !== "0x" || Boolean(creation), txCount, creation, token, tab, page: p, txs, transfers, holdings,
+      balance, isContract: hasCode || Boolean(creation), txCount, creation, token, tab: tab === "contract" && !hasCode ? "txs" : tab, page: p, txs, transfers, holdings,
+      contract: hasCode ? { code, verified: source, file, canVerify: verifier !== null } : null,
     }));
   });
 
@@ -394,6 +495,28 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   app.get("/api-docs", async (_req, reply) => page(reply, "API", apiDocsPage(site), "/api-docs"));
+
+  app.get("/verify", async (req, reply) => {
+    if (!verifier) return notFound(reply, `${OFF}.`);
+    const address = normAddress(String((req.query as { address?: unknown }).address ?? ""));
+    return page(reply, "Verify contract", verifyPage({ contractaddress: address ?? "" }));
+  });
+  app.post("/verify", { bodyLimit: VERIFY_BODY_BYTES, onRequest: beforeUpload }, async (req, reply) => {
+    if (!verifier) return notFound(reply, `${OFF}.`);
+    const field = fields(req);
+    const form: VerifyForm = Object.fromEntries(VERIFY_FIELDS.map((name) => [name, field(name)]));
+    if (!submits(visitor(req))) return fresh(reply, "Verify contract", verifyPage(form, "Too many verifications at once. Try again in a minute"), 429);
+    const sent = await verifier.submit(field);
+    if (!sent.ok) return fresh(reply, "Verify contract", verifyPage(form, sent.error), 422);
+    return reply.header("cache-control", "no-store").redirect(`/verify/status/${sent.guid}`, 303);
+  });
+  app.get("/verify/status/:guid", async (req, reply) => {
+    const guid = (req.params as { guid: string }).guid;
+    const job = /^[0-9a-f]{32}$/.test(guid) ? verifier?.status(guid) : null;
+    if (!job) return notFound(reply, "No such verification. A result is kept for an hour.");
+    if (job.state === "pass") return reply.header("cache-control", "no-store").redirect(`${addressPath(job.address)}?tab=contract`, 303);
+    return fresh(reply, "Verification", verifyStatusPage(job), 200, job.state === "pending" ? 3 : undefined);
+  });
 
   // ------------------------------------------------------------- JSON API
   const api = (reply: FastifyReply) => reply.header("cache-control", "public, max-age=2");
@@ -457,8 +580,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // ------------------------------------------------- Etherscan-compatible
   app.get("/api", async (req, reply) => etherscan(req, reply));
+  // Foundry and Hardhat post a verification, and ask after it, as a form.
+  app.post("/api", { bodyLimit: VERIFY_BODY_BYTES, onRequest: beforeUpload }, async (req, reply) => etherscan(req, reply));
   async function etherscan(req: FastifyRequest, reply: FastifyReply) {
-    const q = req.query as Record<string, string | undefined>;
+    const field = fields(req);
+    const q = Object.fromEntries(ETHERSCAN_FIELDS.map((name) => [name, field(name)])) as Record<(typeof ETHERSCAN_FIELDS)[number], string | undefined>;
+    if (q.module === "contract") return contractApi(req, reply, field);
+    if (req.method !== "GET") return reply.code(405).send({ status: "0", message: "NOTOK", result: "Error! Use GET for this action" });
     const ok = (result: unknown) => api(reply).send({ status: "1", message: "OK", result });
     const none = (message: string) => api(reply).send({ status: "0", message, result: [] });
     const bad = (message: string) => api(reply).send({ status: "0", message: "NOTOK", result: `Error! ${message}` });
@@ -518,6 +646,42 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
       return s === null ? bad("Not a token contract") : ok(s.toString());
     }
     return bad("Unsupported module or action");
+  }
+
+  /** Etherscan's contract module: verification as Foundry and Hardhat ask for it, and what was verified. */
+  async function contractApi(req: FastifyRequest, reply: FastifyReply, field: (name: string) => string | undefined) {
+    const answer = (status: "0" | "1", result: unknown) => reply.header("cache-control", "no-store").send({ status, message: status === "1" ? "OK" : "NOTOK", result });
+    const action = field("action");
+    if (action === "verifysourcecode") {
+      if (req.method !== "POST") return answer("0", "Error! Use POST for this action");
+      if (!verifier) return answer("0", OFF);
+      if (!submits(visitor(req))) return tooMany(reply);
+      const sent = await verifier.submit(field);
+      return sent.ok ? answer("1", sent.guid) : answer("0", sent.error);
+    }
+    if (action === "checkverifystatus") {
+      const guid = field("guid") ?? "";
+      const job = /^[0-9a-f]{32}$/.test(guid) ? verifier?.status(guid) : null;
+      if (!job) return answer("0", "Error! No verification with that guid");
+      if (job.state === "pending") return answer("0", "Pending in queue");
+      return job.state === "pass" ? answer("1", "Pass - Verified") : answer("0", `Fail - Unable to verify. ${job.reason ?? ""}`.trim());
+    }
+    if (action === "getabi" || action === "getsourcecode") {
+      const a = normAddress(field("address") ?? "");
+      if (!a) return answer("0", "Error! Invalid address format");
+      if (!sourceReads(visitor(req))) return tooMany(reply);
+      const v = await verifiedSource(a);
+      if (action === "getabi") return v ? answer("1", v.abi) : answer("0", "Contract source code not verified");
+      const blank = { SourceCode: "", ABI: "Contract source code not verified", ContractName: "", CompilerVersion: "", OptimizationUsed: "", Runs: "", ConstructorArguments: "", EVMVersion: "Default", Library: "", LicenseType: "Unknown", Proxy: "0", Implementation: "", SwarmSource: "" };
+      if (!v) return answer("1", [blank]);
+      return answer("1", [{
+        ...blank,
+        // Etherscan's way of giving several files: the standard JSON input inside a second pair of braces.
+        SourceCode: `{${v.input}}`, ABI: v.abi, ContractName: v.name, CompilerVersion: `v${v.compiler}`, OptimizationUsed: v.optimizer ? "1" : "0",
+        Runs: v.runs === null ? "" : String(v.runs), ConstructorArguments: v.constructor_args ?? "", EVMVersion: v.evm_version ?? "Default",
+      }]);
+    }
+    return answer("0", "Error! Unsupported module or action");
   }
 
   app.setNotFoundHandler((req, reply) => (req.url.startsWith("/api") ? nf(reply) : notFound(reply, "There is nothing at this address.")));

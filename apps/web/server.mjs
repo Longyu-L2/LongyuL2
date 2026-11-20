@@ -2,8 +2,8 @@
 //   PORT   default 8080
 //   PAGES  the pages that are public, comma-separated: claim (index.html), pay, bridge, swap, safe. Default: all.
 //          A page that depends on a service not running yet is left out, and its address answers 404.
-//   LANDING_HOSTS  the names that serve the landing page and its own files in place of the pages
-//          (longyu.network). They need a build that made the landing page: see build.mjs.
+//   LANDING_HOSTS  the names that serve the landing page, the developer page (/developers) and their own
+//          files in place of the pages (longyu.network). They need a build that made them: see build.mjs.
 //   REDIRECT_HOSTS, REDIRECT_TO  other names this service answers on (www.longyu.network) and the
 //          address their visitors are sent to (https://longyu.network). Both or neither.
 // Files are read once at start, so a request never touches the disk and no path can leave dist/.
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 const PAGE_FILES = { claim: ["index.html", "main.js"], pay: ["pay.html", "pay.js"], bridge: ["bridge.html", "bridge.js"], swap: ["swap.html", "swap.js"], safe: ["safe.html", "safe.js"] };
 // Served whichever pages are public.
 const SHARED_FILES = ["favicon.svg", "mark.svg"];
-const LANDING_FILES = ["landing.html", "landing.js", "lockup.svg", "share.png", "Inter-Regular.woff2", "Inter-SemiBold.woff2", "Sora-SemiBold.woff2", "JetBrainsMono-Medium.woff2", "OFL.txt"];
+const LANDING_FILES = ["landing.html", "landing.js", "developers.html", "developers.js", "lockup.svg", "share.png", "Inter-Regular.woff2", "Inter-SemiBold.woff2", "Sora-SemiBold.woff2", "JetBrainsMono-Medium.woff2", "OFL.txt"];
 const TYPES = { html: "text/html; charset=utf-8", js: "text/javascript; charset=utf-8", svg: "image/svg+xml", png: "image/png", woff2: "font/woff2", txt: "text/plain; charset=utf-8" };
 // Compressed as they are: packing them again saves nothing.
 const PACKED = new Set(["png", "woff2"]);
@@ -78,7 +78,7 @@ export function loadFiles(pages, read) {
   return { files, home };
 }
 
-/** The landing page's files: what the names in LANDING_HOSTS serve, and all they serve. */
+/** The landing and developer pages' files: what the names in LANDING_HOSTS serve, and all they serve. */
 export function loadLanding(read) {
   return load([...LANDING_FILES, ...SHARED_FILES], read);
 }
@@ -138,6 +138,7 @@ export function createHandler({ files: pageFiles, home }, redirect = null, landi
       if (home === "/index.html") return serve(files.get(home));
       return send(302, { location: home, "cache-control": "no-store" }, null);
     }
+    if (onLanding && path === "/developers") return serve(files.get("/developers.html"));
     // Browsers ask for this name on their own.
     if (path === "/favicon.ico") return send(301, { location: "/favicon.svg", "cache-control": "max-age=86400" }, null);
     const file = files.get(path);

@@ -7,6 +7,7 @@ import { SYSTEM_DEPOSITOR } from "../indexer.ts";
 import { COUNT_CAP, DATA_BYTES, TX_ITEMS, type BlockRow, type LogRow, type Part, type TokenRow, type TransferRow, type TxListRow, type TxRow } from "../queries.ts";
 import { formatGasPrice, formatNumber, formatUnits, percent, short, timeAgo, utc } from "./format.ts";
 import { addressPath, blockPath, html, isAddress, SafeHtml, tokenPath, txPath } from "./html.ts";
+import { contractTab, type ContractTab } from "./verify.ts";
 
 export interface Site {
   chainName: string;
@@ -20,6 +21,8 @@ export interface Site {
   websiteUrl?: string | null;
   mineUrl?: string | null;
   githubUrl?: string | null;
+  /** Whether the explorer is taking contract verifications. */
+  verification?: boolean;
   /** Lower-case address -> label (predeploys, LONGYU contracts, token symbols). */
   labels: Map<string, string>;
   /** Fingerprint of the static files. It is part of their addresses, so a release never meets an old cached copy. */
@@ -56,12 +59,15 @@ function sections(site: Site): { title: string; links: SafeHtml[] }[] {
   return [
     { title: "Explorer", links: ([["/blocks", "Blocks"], ["/txs", "Transactions"], ["/tokens", "Tokens"], ["/bridge", "Bridge activity"]] as Link[]).map(inside) },
     { title: "Network", links: network.map(outside) },
-    { title: "Developers", links: [inside(["/api-docs", "API"]), ...(site.githubUrl ? [outside([site.githubUrl, "GitHub"])] : [])] },
+    { title: "Developers", links: [...(site.verification ? [inside(["/verify", "Verify contract"])] : []), inside(["/api-docs", "API"]), ...(site.githubUrl ? [outside([site.githubUrl, "GitHub"])] : [])] },
   ];
 }
 
-/** `active` is the path of the page's entry in the menu; "/" is the home page, which opens with the search. */
-export function layout(site: Site, title: string, body: SafeHtml, active = ""): string {
+/**
+ * `active` is the path of the page's entry in the menu; "/" is the home page, which opens with the search.
+ * `refresh` makes the page load itself again after that many seconds.
+ */
+export function layout(site: Site, title: string, body: SafeHtml, active = "", refresh?: number): string {
   const nav = [["/blocks", "Blocks"], ["/txs", "Transactions"], ["/tokens", "Tokens"], ["/bridge", "Bridge"], ["/api-docs", "API"]] as const;
   const home = active === "/";
   const groups = sections(site);
@@ -74,6 +80,7 @@ export function layout(site: Site, title: string, body: SafeHtml, active = ""): 
 <meta name="description" content="${`Blocks, transactions, tokens and addresses on ${site.chainName}.`}">
 <meta name="theme-color" content="#FFFFFF">
 <meta name="color-scheme" content="only light">
+${refresh ? html`<meta http-equiv="refresh" content="${Math.floor(refresh)}">` : ""}
 <link rel="icon" href="/static/favicon.svg?v=${site.build}" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css?v=${site.build}">
 <script src="/static/app.js?v=${site.build}" defer></script>
@@ -84,7 +91,7 @@ export function layout(site: Site, title: string, body: SafeHtml, active = ""): 
     ${brand}
     <nav class="nav" aria-label="Pages">${nav.map(([href, label]) => (active === href ? html`<a href="${href}" class="on" aria-current="page">${label}</a>` : html`<a href="${href}">${label}</a>`))}</nav>
     ${home ? "" : searchForm(false)}
-    <span class="pill net"><span class="dot"></span>${site.chainName}</span>
+    <span class="pill net">${site.chainName}</span>
     <details class="menu">
       <summary aria-label="Menu">${ICON_MENU}</summary>
       <nav class="menu-panel" aria-label="Menu">
@@ -349,15 +356,18 @@ export function addressPage(
     txCount: bigint;
     creation: { hash: string; from_address: string } | null;
     token: TokenRow | null;
-    tab: "txs" | "transfers" | "tokens";
+    tab: "txs" | "transfers" | "tokens" | "contract";
     page: number;
     txs: TxListRow[];
     transfers: TransferRow[];
     holdings: { token: string; balance: string; name: string | null; symbol: string | null; decimals: number | null; kind: string }[];
+    /** The Contract tab, for an address that has code. */
+    contract?: ContractTab | null;
   },
 ): SafeHtml {
   const label = site.labels.get(a);
-  const tabs = [["txs", "Transactions"], ["transfers", "Token transfers"], ["tokens", `Tokens (${d.holdings.length})`]] as const;
+  const tabs: [string, string, string][] = [["txs", "Transactions", ""], ["transfers", "Token transfers", ""], ["tokens", `Tokens (${d.holdings.length})`, ""]];
+  if (d.contract) tabs.push(["contract", "Contract", d.contract.verified ? "verified" : ""]);
   return html`<div class="title-row"><h1>${d.isContract ? "Contract" : "Address"}</h1>${label ? html`<span class="pill blue">${label}</span>` : ""}</div>
   <p class="mono break lead">${a}${copy(a)}</p>
   <section class="stats compact">
@@ -369,7 +379,8 @@ export function addressPage(
     d.creation ? ["Created by", html`${addr(site, d.creation.from_address)} in ${txLink(d.creation.hash)}`] : ["", null],
     d.token ? ["Token", html`<a href="${tokenPath(d.token.address)}">${d.token.name ?? "Unnamed"} (${d.token.symbol ?? "?"})</a>`] : ["", null],
   ])}</section>` : ""}
-  <nav class="tabs">${tabs.map(([k, l]) => html`<a href="${`${addressPath(a)}?tab=${k}`}" class="${d.tab === k ? "on" : ""}">${l}</a>`)}</nav>
+  <nav class="tabs">${tabs.map(([k, l, mark]) => html`<a href="${`${addressPath(a)}?tab=${k}`}" class="${d.tab === k ? "on" : ""}">${mark ? html`<span class="${mark}">${l}</span>` : l}</a>`)}</nav>
+  ${d.tab === "contract" && d.contract ? contractTab(a, d.contract) : ""}
   ${d.tab === "txs" ? html`${txTable(site, d.txs)}${pager(`${addressPath(a)}?tab=txs`, d.page, d.txs.length === PAGE_SIZE)}` : ""}
   ${d.tab === "transfers" ? html`${transferTable(site, d.transfers)}${pager(`${addressPath(a)}?tab=transfers`, d.page, d.transfers.length === PAGE_SIZE)}` : ""}
   ${d.tab === "tokens" ? (d.holdings.length ? html`<div class="table"><table><thead><tr><th>Token</th><th class="r">Balance</th></tr></thead><tbody>
@@ -473,6 +484,9 @@ export function apiDocsPage(site: Site): SafeHtml {
     ["GET /api/v1/token/{address}/holders?p=", "Top holders"],
     ["GET /api?module=account&action=balance|txlist|tokentx|tokenbalance", "Etherscan-compatible"],
     ["GET /api?module=stats&action=tokensupply&contractaddress=", "Etherscan-compatible"],
+    ["GET /api?module=contract&action=getabi|getsourcecode&address=", "Etherscan-compatible. A verified contract's ABI, or its source, compiler and settings"],
+    ["POST /api module=contract action=verifysourcecode", "Etherscan-compatible, as Foundry and Hardhat send it. Answers with a guid"],
+    ["GET /api?module=contract&action=checkverifystatus&guid=", "Etherscan-compatible. The state of a verification, kept for an hour"],
   ];
   return html`<h1>API</h1>
   <p class="muted">JSON over HTTPS, no key. ${site.chainName}, chain ID ${site.chainId}. Amounts are integers in the smallest unit, as strings. Lists leave out a transaction's input data, except the Etherscan-compatible txlist, which gives its first ${formatNumber(DATA_BYTES)} bytes and at most 100 transactions a page. Counts of transactions, holders and transfers stop at ${formatNumber(COUNT_CAP)}.</p>

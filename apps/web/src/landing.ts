@@ -1,65 +1,12 @@
-import { blockNumberOf, formatCount, nextShown, parseLandingConfig, walletChain } from "./landing-core.ts";
+import { blockNumberOf, formatCount, nextShown, parseLandingConfig } from "./landing-core.ts";
+import { $, copyButtons, topBar, walletButton } from "./site.ts";
 
 declare const __LANDING_CONFIG__: unknown;
 
 const config = parseLandingConfig(__LANDING_CONFIG__);
-const $ = (id: string) => document.getElementById(id)!;
-
-// The bar takes a ground of its own once the page moves under it.
-const top = $("top");
-const moved = () => top.classList.toggle("moved", window.scrollY > 8);
-window.addEventListener("scroll", moved, { passive: true });
-moved();
-
-// On a phone the bar's links open as a sheet under it. The button shows only once this script runs.
-const menuButton = $("menu-button");
-const setMenu = (open: boolean) => {
-  top.classList.toggle("open", open);
-  document.documentElement.classList.toggle("menu-open", open);
-  menuButton.setAttribute("aria-expanded", String(open));
-  menuButton.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
-};
-menuButton.hidden = false;
-menuButton.addEventListener("click", () => setMenu(!top.classList.contains("open")));
-$("menu").addEventListener("click", (e) => {
-  if ((e.target as Element).closest("a")) setMenu(false);
-});
-document.addEventListener("keydown", (e) => {
-  if (e.key !== "Escape" || !top.classList.contains("open")) return;
-  setMenu(false);
-  menuButton.focus();
-});
-window.matchMedia("(min-width: 981px)").addEventListener("change", (e) => e.matches && setMenu(false));
-
-document.querySelectorAll<HTMLButtonElement>("button[data-copy]").forEach((button) => {
-  button.addEventListener("click", async () => {
-    try {
-      await navigator.clipboard.writeText(button.dataset.copy ?? "");
-      button.textContent = "Copied";
-    } catch {
-      button.textContent = "Not copied";
-    }
-    setTimeout(() => (button.textContent = "Copy"), 1500);
-  });
-});
-
-interface Wallet {
-  request(call: { method: string; params?: unknown[] }): Promise<unknown>;
-}
-
-$("add-network").addEventListener("click", async () => {
-  const note = $("add-note");
-  const wallet = (window as { ethereum?: Wallet }).ethereum;
-  if (!config) return void (note.textContent = "The network details are not available.");
-  if (!wallet) return void (note.textContent = "No wallet found in this browser.");
-  note.textContent = "Confirm in your wallet.";
-  try {
-    await wallet.request({ method: "wallet_addEthereumChain", params: [walletChain(config)] });
-    note.textContent = `${config.chainName} is in your wallet.`;
-  } catch (e) {
-    note.textContent = (e as { code?: number }).code === 4001 ? "Cancelled in the wallet." : "The wallet did not add the network.";
-  }
-});
+topBar();
+copyButtons();
+walletButton(config);
 
 // The live block height: read once a second while the page is in view, and counted up through the
 // blocks in between.

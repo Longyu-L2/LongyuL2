@@ -56,6 +56,13 @@ export const ConfigSchema = z.object({
   ORIGIN_SECRET: z.string().min(32).optional(),
   /** Requests per minute per client address. */
   RATE_LIMIT: z.coerce.number().int().min(10).max(100_000).default(600),
+
+  /** "false" stops new contract verifications. Sources verified before stay on their pages. */
+  VERIFICATION: bool(true),
+  /** Where downloaded compilers are kept. Each is checked against its pinned hash every time it is read. */
+  COMPILER_CACHE_DIR: z.string().min(1).optional(),
+  /** Bytes of verified source the database takes in 24 hours. The database is shared, so this is its guard. */
+  VERIFY_DAILY_BYTES: z.coerce.number().int().min(0).max(10 * 1024 ** 3).default(100 * 1024 * 1024),
 });
 
 export type Config = z.infer<typeof ConfigSchema>;

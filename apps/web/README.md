@@ -5,6 +5,7 @@ LONGYU's landing page and its pages for a browser wallet: static HTML with one s
 | Page | File | What it does |
 |---|---|---|
 | Landing | `landing.html` | The front page of `longyu.network`: the live block height, the network details and links to everything else |
+| Developers | `developers.html` | `longyu.network/developers`: the network's settings, deploy and verify commands for Foundry and Hardhat, and the addresses of the contracts on the chain. It sends no requests |
 | Claim | `index.html` | Claims mined rewards with a Merkle proof from the published data file |
 | Bridge | `bridge.html` | Deposits from BSC, and the three steps of a withdrawal: start, prove, finalize |
 | Swap | `swap.html` | LONGYU Swap: swap, add and remove liquidity |
@@ -28,4 +29,4 @@ The build also writes each page's Content-Security-Policy. A page may send reque
 
 [server.mjs](server.mjs) serves `dist/` and nothing else. `PAGES` names the pages that are public; any other page answers 404. Files are read once at start, so a request never touches the disk.
 
-One service answers on several names. A name in `LANDING_HOSTS` serves the landing page and its own files (fonts, logo, share image) and none of the wallet pages; every other name serves the wallet pages and none of the landing page. A name in `REDIRECT_HOSTS` only sends its visitors to `REDIRECT_TO`. The landing page is built only when every address it links to is set (`SITE_URL`, `APP_URL`, `MINE_URL`, `EXPLORER_URL`, `L2_RPC_URL`, `CHAIN_ID`); `GITHUB_URL` and `X_URL` add their links when set. Its fonts are Inter, Sora and JetBrains Mono under the SIL Open Font License ([src/fonts/OFL.txt](src/fonts/OFL.txt)).
+One service answers on several names. A name in `LANDING_HOSTS` serves the landing page and its own files (fonts, logo, share image) and none of the wallet pages; every other name serves the wallet pages and none of the landing page. A name in `REDIRECT_HOSTS` only sends its visitors to `REDIRECT_TO`. The landing page is built only when every address it links to is set (`SITE_URL`, `APP_URL`, `MINE_URL`, `EXPLORER_URL`, `L2_RPC_URL`, `CHAIN_ID`); `GITHUB_URL` and `X_URL` add their links when set. The developer page is built with it, and lists a contract only when its address is set (`L2_TOKEN`, `SWAP_ROUTER`, `SWAP_FACTORY`, `L1_STANDARD_BRIDGE`, `L1_PORTAL`, `L1_TOKEN`); a value that is not an address stops the build. Its fonts are Inter, Sora and JetBrains Mono under the SIL Open Font License ([src/fonts/OFL.txt](src/fonts/OFL.txt)).

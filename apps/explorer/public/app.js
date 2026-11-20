@@ -18,8 +18,13 @@
   document.addEventListener("click", async (e) => {
     const b = e.target instanceof Element ? e.target.closest("button.copy") : null;
     if (!b) return;
+    // A button inside a summary copies; it does not open or close what the summary heads.
+    if (b.closest("summary")) e.preventDefault();
+    // data-copy-from names the element whose text is copied (a source file, an ABI).
+    const from = b.getAttribute("data-copy-from");
+    const source = from ? document.getElementById(from) : null;
     try {
-      await navigator.clipboard.writeText(b.getAttribute("data-copy") || "");
+      await navigator.clipboard.writeText(source ? source.textContent || "" : b.getAttribute("data-copy") || "");
       b.classList.add("done");
       setTimeout(() => b.classList.remove("done"), 1200);
     } catch {
@@ -64,6 +69,44 @@
         say("Added");
       } catch {
         say("Not added");
+      }
+    });
+  }
+
+  // On a narrow screen the row of tabs scrolls sideways: start it where the open tab is.
+  const tab = document.querySelector(".tabs a.on");
+  if (tab) tab.parentElement.scrollLeft = tab.offsetLeft - tab.parentElement.offsetLeft - 16;
+
+  // The verification form: single-file settings show for a single file, and a file can be read into the source box.
+  const form = document.getElementById("verify-form");
+  if (form) {
+    const format = document.getElementById("verify-format");
+    const single = document.getElementById("verify-single");
+    const source = document.getElementById("verify-source");
+    const pick = document.getElementById("verify-file");
+    const input = document.getElementById("verify-file-input");
+    const note = document.getElementById("verify-note");
+    const show = () => (single.hidden = format.value !== "solidity-single-file");
+    format.addEventListener("change", show);
+    show();
+    pick.hidden = false;
+    pick.addEventListener("click", () => input.click());
+    input.addEventListener("change", async () => {
+      const file = input.files && input.files[0];
+      input.value = "";
+      if (!file) return;
+      if (file.size > Number(form.getAttribute("data-file-bytes"))) {
+        note.textContent = "That file is too large";
+        return;
+      }
+      try {
+        source.value = await file.text();
+        if (/.json$/i.test(file.name)) format.value = "solidity-standard-json-input";
+        else if (/.sol$/i.test(file.name)) format.value = "solidity-single-file";
+        show();
+        note.textContent = file.name;
+      } catch {
+        note.textContent = "That file could not be read";
       }
     });
   }

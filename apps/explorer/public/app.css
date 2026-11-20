@@ -15,6 +15,7 @@
   color-scheme: only light;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
 body {
   margin: 0; min-height: 100vh; display: flex; flex-direction: column;
@@ -45,7 +46,6 @@ code, .mono { font-family: var(--mono); font-size: 13px; }
 .nav a.on { color: var(--blue); font-weight: 600; }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: rgba(10, 31, 61, 0.05); color: var(--soft); font-size: 12px; white-space: nowrap; }
 .pill.net { margin-left: auto; padding: 6px 12px; background: none; border: 1px solid var(--line-strong); color: var(--text); }
-.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); }
 .pill.ok { background: rgba(11, 128, 88, 0.09); color: var(--positive); }
 .pill.bad { background: rgba(217, 45, 32, 0.08); color: var(--danger); }
 .pill.blue { background: rgba(11, 111, 219, 0.09); color: var(--blue); }
@@ -187,6 +187,37 @@ tr.failed td:first-child a { color: var(--danger); }
 .results li { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; display: flex; justify-content: space-between; gap: 12px; }
 .notfound { display: grid; justify-items: center; gap: 12px; padding: 64px 0; text-align: center; }
 
+/* Contract verification: the form, and a verified contract's source */
+.form { display: grid; gap: 16px; max-width: 780px; }
+.form label { display: grid; gap: 6px; min-width: 0; color: var(--soft); font-size: 13px; }
+.form input:not([type]), .form select, .form textarea {
+  width: 100%; height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong);
+  background: var(--card); color: var(--text); font: inherit; font-size: 14px; outline: none;
+}
+.form input.mono { font-family: var(--mono); font-size: 13px; }
+.form textarea { height: auto; min-height: 240px; padding: 10px 12px; resize: vertical; font: 500 13px/1.55 var(--mono); white-space: pre; overflow: auto; tab-size: 4; }
+.form input:not([type]):focus, .form select:focus, .form textarea:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(11, 111, 219, 0.14); }
+.form ::placeholder { color: var(--faint); }
+.form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.form legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.form-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+.form-row.four { grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: end; }
+.form label.check { display: flex; align-items: center; gap: 8px; height: 40px; color: var(--text); font-size: 14px; cursor: pointer; }
+.form label.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--blue); }
+.form-end { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.form-error { margin: 0; max-width: 780px; padding: 12px 16px; border: 1px solid rgba(217, 45, 32, 0.2); border-radius: 10px; background: rgba(217, 45, 32, 0.05); color: var(--danger); overflow-wrap: anywhere; }
+.form-error.flat, .waiting { margin: 0; padding: 0; border: 0; background: none; }
+.unverified { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--soft); }
+.verified::after { content: ""; display: inline-block; width: 16px; height: 16px; margin-left: 6px; vertical-align: -3px; background: url("/static/i-check.svg") center / 16px 16px no-repeat; }
+.source .card-h h2 { font-size: 13px; }
+.source .card-h .copy, .raw summary .copy { flex: none; margin: -6px -6px -6px 8px; }
+.raw summary .copy { float: right; margin-top: -4px; }
+.files { display: flex; flex-wrap: wrap; gap: 6px; max-height: 128px; overflow: auto; margin-bottom: 12px; scrollbar-width: thin; }
+.files a { max-width: 100%; padding: 3px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--soft); font: 12px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files a:hover { text-decoration: none; color: var(--text); }
+.files a.on { border-color: var(--blue); background: var(--card); color: var(--blue); }
+pre.code { margin: 0; padding: 14px 16px; max-height: 640px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; background: #FAFCFF; font-size: 12.5px; line-height: 1.6; white-space: pre; tab-size: 4; scrollbar-width: thin; }
+
 /* Footer */
 .foot { background: var(--card); border-top: 1px solid var(--line); color: var(--soft); font-size: 14px; }
 .foot-top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr); gap: 32px 56px; padding-top: 40px; padding-bottom: 32px; }
@@ -252,6 +283,9 @@ tr.failed td:first-child a { color: var(--danger); }
   th, td { padding-left: 14px; padding-right: 14px; }
   .foot-top { padding-top: 28px; }
   .foot-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-row { grid-template-columns: minmax(0, 1fr); }
+  .form-row.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  pre.code { padding: 12px; }
 }
 @media (max-width: 360px) {
   .pill.net { display: none; }
@@ -262,4 +296,5 @@ tr.failed td:first-child a { color: var(--danger); }
   .search input { font-size: 16px; padding-right: 12px; text-overflow: ellipsis; }
   .hero .search input { padding-right: 60px; }
   .search kbd { display: none; }
+  .form input:not([type]), .form select, .form textarea { font-size: 16px; }
 }

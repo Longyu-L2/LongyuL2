@@ -75,12 +75,12 @@ test("an unverified miner earns the full rate on testnet, and the numbers add up
     const n = await readyUser(env, "newbie", false);
     type Rewards = { earned: string; claimed: string; claimable: string; pending: string; entitled: string; at: string; accrual: { perHour: string; until: string } | null };
     const read = async () => {
-      const { earned, claimed, claimable, pending, entitled, at, accrual } = (await call<Rewards>(env, "GET", "/v1/rewards", undefined, auth(n))).json;
+      const { earned, claimed, claimable, pending, entitled, at, accrual, unlock } = (await call<Rewards & { unlock: unknown }>(env, "GET", "/v1/rewards", undefined, auth(n))).json;
       const r: Rewards = { earned, claimed, claimable, pending, entitled, at, accrual };
       assert.equal(BigInt(r.earned), BigInt(r.claimed) + BigInt(r.claimable) + BigInt(r.pending));
       // The mining screen reads the same numbers.
       const s = (await call<{ balances: Rewards }>(env, "GET", "/v1/mining/status", undefined, auth(n))).json;
-      assert.deepEqual(s.balances, r);
+      assert.deepEqual(s.balances, { ...r, unlock });
       return r;
     };
     assert.deepEqual(await read(), { earned: "0", claimed: "0", claimable: "0", pending: "0", entitled: "0", accrual: null, at: env.clock.now().toString() });
@@ -118,6 +118,120 @@ test("an unverified miner earns the full rate on testnet, and the numbers add up
     assert.deepEqual([stats.json.miners, stats.json.verifiedMiners], ["1", "0"]);
     const board = await call<{ entries: { handle: string }[] }>(env, "GET", "/v1/leaderboard");
     assert.equal(board.json.entries.length, 1);
+  } finally {
+    await env.close();
+  }
+});
+
+const unlockOf = async (env: TestEnv, u: TestUser) => {
+  const r = (await call<{ unlock: { at: string; exact: boolean } | null }>(env, "GET", "/v1/rewards", undefined, auth(u))).json.unlock;
+  const s = (await call<{ balances: { unlock: typeof r } }>(env, "GET", "/v1/mining/status", undefined, auth(u))).json.balances.unlock;
+  assert.deepEqual(s, r);
+  return r;
+};
+
+test("the rewards say when pending rewards can next be claimed", async () => {
+  const env = await makeEnv();
+  try {
+    const n = await readyUser(env, "newbie", false);
+    const start = env.deps.schedule.startTime;
+    const HALF_DAY = 12n * 3600n;
+    assert.equal(await unlockOf(env, n), null);
+
+    // A day that is not settled: the day closes, the grace and the two job passes go by, then the veto window.
+    env.clock.at(0n, 3600n);
+    assert.equal((await mine(env, n)).status, 200);
+    env.clock.advance(6n * 3600n);
+    assert.deepEqual(await unlockOf(env, n), { at: (start + 86_400n + 17n * 60n + HALF_DAY).toString(), exact: false });
+
+    // Settled and not posted: no time is known.
+    env.clock.at(1n, 16n * 60n);
+    assert.equal(await settleNextDay(env.deps), 0n);
+    assert.equal(await unlockOf(env, n), null);
+
+    // Posted: the end of the root's veto window, to the second.
+    assert.equal(await publishNext(env.deps), 0n);
+    clearRootCache();
+    const posted = env.clock.now();
+    assert.deepEqual(await unlockOf(env, n), { at: (posted + HALF_DAY).toString(), exact: true });
+    // A session started meanwhile does not move it: the posted rewards come first.
+    env.clock.advance(3600n);
+    assert.equal((await mine(env, n)).status, 200);
+    env.clock.advance(HALF_DAY - 3601n);
+    clearRootCache();
+    assert.deepEqual(await unlockOf(env, n), { at: (posted + HALF_DAY).toString(), exact: true });
+
+    // The window is over: the rewards are claimable within a second, without waiting out the held reading of
+    // the roots, and the next time is the running day's.
+    env.clock.advance(1n);
+    await new Promise((r) => setTimeout(r, 1100));
+    const ready = (await call<{ claimable: string }>(env, "GET", "/v1/rewards", undefined, auth(n))).json;
+    assert.equal(ready.claimable, (24n * E18).toString());
+    await indexEvents(env.deps);
+    assert.deepEqual(await unlockOf(env, n), { at: (start + 2n * 86_400n + 17n * 60n + HALF_DAY).toString(), exact: false });
+
+    // A day that closed and is late to settle keeps no time that has passed.
+    env.clock.at(2n, 17n * 60n + HALF_DAY);
+    clearRootCache();
+    assert.equal(await unlockOf(env, n), null);
+  } finally {
+    await env.close();
+  }
+});
+
+test("a root still in its veto window pushes the next day's unlock time back", async () => {
+  const env = await makeEnv();
+  try {
+    env.chain.challengeDelay = 30n * 3600n;
+    const a = await readyUser(env, "a");
+    const b = await readyUser(env, "b");
+    env.clock.at(0n, 3600n);
+    assert.equal((await mine(env, a)).status, 200);
+    env.clock.at(1n, 16n * 60n);
+    assert.equal(await settleNextDay(env.deps), 0n);
+    assert.equal(await publishNext(env.deps), 0n);
+    clearRootCache();
+    const cleared = env.clock.now() + 30n * 3600n;
+    assert.deepEqual(await unlockOf(env, a), { at: cleared.toString(), exact: true });
+
+    // b mines day 1 only. Its root cannot be posted before day 0's has cleared, and then waits its own window.
+    env.clock.at(1n, 3600n);
+    assert.equal((await mine(env, b)).status, 200);
+    // From the session's first second, before it has added anything.
+    assert.ok(cleared > env.deps.schedule.startTime + 2n * 86_400n + 17n * 60n);
+    assert.deepEqual(await unlockOf(env, b), { at: (cleared + 30n * 3600n).toString(), exact: false });
+  } finally {
+    await env.close();
+  }
+});
+
+test("no unlock time is given for rewards held until verification, or when the veto window cannot be read", async () => {
+  const gated = await makeEnv({ rewards: VERIFICATION_GATED_PARAMS });
+  try {
+    const n = await readyUser(gated, "newbie", false);
+    gated.clock.at(0n, 3600n);
+    assert.equal((await mine(gated, n)).status, 200);
+    gated.clock.advance(3600n);
+    assert.equal(await unlockOf(gated, n), null);
+    await cycle(gated, 0n);
+    const held = (await call<{ pending: string; unlock: unknown }>(gated, "GET", "/v1/rewards", undefined, auth(n))).json;
+    assert.deepEqual([held.pending, held.unlock], [(12n * E18).toString(), null]);
+  } finally {
+    await gated.close();
+  }
+
+  const env = await makeEnv();
+  try {
+    const n = await readyUser(env, "newbie", false);
+    env.clock.at(0n, 3600n);
+    assert.equal((await mine(env, n)).status, 200);
+    env.clock.advance(6n * 3600n);
+    env.chain.readDistributorConfig = async () => {
+      throw new Error("rpc down");
+    };
+    clearRootCache();
+    const r = (await call<{ pending: string; unlock: unknown }>(env, "GET", "/v1/rewards", undefined, auth(n))).json;
+    assert.deepEqual([r.pending, r.unlock], [(6n * E18).toString(), null]);
   } finally {
     await env.close();
   }

@@ -12,7 +12,7 @@ import { colors, radius, space } from "@/design/tokens";
 import { success } from "@/design/haptics";
 import { Button, Card, Col, Columns, Empty, ErrorText, Header, List, Notice, Row, Screen, Section, Skeleton, T } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { LiveAmount, LiveFigure, RewardBar, WithBalances, partColor, type RewardPart } from "@/components/Rewards";
+import { LiveAmount, LiveFigure, RewardBar, UnlockNote, partColor, type RewardPart } from "@/components/Rewards";
 
 interface Rewards {
   address: string;
@@ -108,11 +108,7 @@ export default function WalletScreen() {
               <Button title={t("claim")} onPress={() => void claim()} busy={busy} disabled={!r || r.claimable === "0"} />
               <Notice tone="success">{msg}</Notice>
               <ErrorText>{error || (!r && rewards.error ? t(errorKeyOf(rewards.error)) : "")}</ErrorText>
-              {!msg && !error ? (
-                <WithBalances>
-                  {(live) => (live && live.claimable === 0n && live.pending > 0n ? <T variant="small" color={colors.textSoft} center>{t("pendingHint")}</T> : null)}
-                </WithBalances>
-              ) : null}
+              {!msg && !error ? <UnlockNote /> : null}
             </View>
           </Card>
 

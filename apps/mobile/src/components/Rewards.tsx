@@ -3,9 +3,10 @@
  * shared balances itself, so a number that moves every second redraws only itself.
  */
 import { View } from "react-native";
-import { useLiveBalances } from "@/lib/resources";
-import { shares, type Live } from "@/lib/rewards";
-import { formatTokenFixed } from "@/lib/format";
+import { useApp } from "@/lib/app-state";
+import { useLiveBalances, useUnlock } from "@/lib/resources";
+import { shares } from "@/lib/rewards";
+import { fill, formatTokenFixed } from "@/lib/format";
 import { colors, tabular } from "@/design/tokens";
 import { Figure, Skeleton, T } from "./ui";
 
@@ -42,7 +43,23 @@ export function RewardBar() {
   );
 }
 
-/** What `children` gets: the balances now, for a line that depends on them. */
-export function WithBalances({ children }: { children: (live: Live | null) => React.ReactNode }) {
-  return <>{children(useLiveBalances())}</>;
+const UNLOCK_STRING = {
+  today: ["claimableToday", "claimableTodayAbout"],
+  tomorrow: ["claimableTomorrow", "claimableTomorrowAbout"],
+  later: ["claimableOn", "claimableOnAbout"],
+} as const;
+
+/** Under the claim button while there is nothing to claim: when the pending rewards can be. */
+export function UnlockNote() {
+  const { t } = useApp();
+  const live = useLiveBalances();
+  const unlock = useUnlock();
+  if (!live || live.claimable > 0n || live.pending === 0n || unlock?.day === "due") return null;
+  const line = unlock
+    ? fill(t(UNLOCK_STRING[unlock.day][unlock.exact ? 0 : 1]), {
+        time: unlock.at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+        date: unlock.at.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+      })
+    : t("pendingHint");
+  return <T variant="small" color={colors.textSoft} center>{line}</T>;
 }

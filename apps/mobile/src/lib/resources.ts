@@ -7,7 +7,7 @@ import { AppState } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { api } from "./core";
 import { createCache, type Entry } from "./cache";
-import { liveBalances, newer, type Balances, type Live, type Reading } from "./rewards";
+import { liveBalances, newer, unlockOf, type Balances, type Live, type Reading, type Unlock } from "./rewards";
 import { clockOffset, steadyOffset } from "./server-clock";
 
 // The account's balances come with two answers (mining status and rewards); the later one counts.
@@ -87,6 +87,32 @@ export function useLiveBalances(): Live | null {
     return () => clearInterval(id);
   }, [r, accruing]);
   return live;
+}
+
+/**
+ * When pending rewards can next be claimed: null when the API gave no time. The answer is worked out
+ * again at midnight and at the moment itself, and then the rewards are read again, so the claim
+ * button wakes without the screen being reopened.
+ */
+export function useUnlock(): Unlock | null {
+  const r = useSyncExternalStore(watch, held, held);
+  const [turn, setTurn] = useState(0);
+  const unlock = r ? unlockOf(r.balances, Date.now() + (offset ?? 0)) : null;
+  const due = unlock ? Number(r!.balances.unlock!.at) * 1000 : null;
+  useEffect(() => {
+    if (due === null) return;
+    const now = Date.now() + (offset ?? 0);
+    if (due <= now) {
+      // Everyone waiting on the same settlement asks a few seconds apart.
+      const id = setTimeout(() => void cache.load("/v1/rewards", true), 1500 + Math.random() * 4000);
+      return () => clearTimeout(id);
+    }
+    const midnight = new Date(now);
+    midnight.setHours(24, 0, 0, 0);
+    const id = setTimeout(() => setTurn((n) => n + 1), Math.min(due, midnight.getTime()) - now + 50);
+    return () => clearTimeout(id);
+  }, [due, turn]);
+  return unlock;
 }
 
 const ahead = () => offset ?? 0;

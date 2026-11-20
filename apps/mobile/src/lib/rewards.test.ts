@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { liveBalances, newer, shares, type Reading } from "./rewards.ts";
+import { liveBalances, newer, shares, unlockOf, type Reading } from "./rewards.ts";
 
 const E18 = 10n ** 18n;
 const T0 = 1_800_000_000_000;
@@ -129,4 +129,38 @@ test("the bar's parts add up to the whole", () => {
   assert.deepEqual(shares({ earned: 0n, claimed: 0n, claimable: 0n, pending: 0n }), { claimed: 0, claimable: 0, pending: 0 });
   const all = shares({ earned: 5n, claimed: 0n, claimable: 0n, pending: 5n });
   assert.deepEqual(all, { claimed: 0, claimable: 0, pending: 1 });
+});
+
+// The device's own calendar decides the day, so these build their times from local dates.
+const local = (day: number, hour: number, minute = 0, second = 0) => new Date(2026, 10, day, hour, minute, second).getTime();
+const unlock = (ms: number, exact = true) => reading({ unlock: { at: String(ms / 1000), exact } }).balances;
+
+test("the unlock time is worded by the device's calendar and never shown before the rewards open", () => {
+  // 17:46:39 is shown as 17:47: at 17:46 the claim would still be closed.
+  const today = unlockOf(unlock(local(20, 17, 46, 39)), local(20, 13, 30));
+  assert.deepEqual(today, { day: "today", at: new Date(local(20, 17, 47)), exact: true });
+  assert.equal(unlockOf(unlock(local(20, 17, 46)), local(20, 13, 30))!.at.getTime(), local(20, 17, 46));
+  // A second before, it is still ahead; from the moment itself it is due.
+  assert.equal(unlockOf(unlock(local(20, 17, 46, 39)), local(20, 17, 46, 38))!.day, "today");
+  assert.equal(unlockOf(unlock(local(20, 17, 46, 39)), local(20, 17, 46, 39))!.day, "due");
+  assert.equal(unlockOf(unlock(local(20, 17, 46, 39)), local(21, 9))!.day, "due");
+
+  assert.deepEqual(unlockOf(unlock(local(21, 17, 47), false), local(20, 18)), { day: "tomorrow", at: new Date(local(21, 17, 47)), exact: false });
+  // A minute past midnight is tomorrow, however soon it is; the last minute of the day rounds up into tomorrow.
+  assert.equal(unlockOf(unlock(local(21, 0, 1)), local(20, 23, 59))!.day, "tomorrow");
+  assert.deepEqual(unlockOf(unlock(local(20, 23, 59, 30)), local(20, 23, 0)), { day: "tomorrow", at: new Date(local(21, 0)), exact: true });
+  assert.equal(unlockOf(unlock(local(21, 0, 1)), local(21, 0, 0, 30))!.day, "today");
+  assert.equal(unlockOf(unlock(local(23, 17, 46)), local(20, 18))!.day, "later");
+});
+
+test("no unlock time is made up from an answer that carries none, or a broken one", () => {
+  const now = local(20, 13);
+  assert.equal(unlockOf(reading().balances, now), null);
+  assert.equal(unlockOf(reading({ unlock: null }).balances, now), null);
+  for (const at of ["", "soon", "-5", "1e12", "17:46", String(now / 1000 + 11 * 86_400)]) {
+    assert.equal(unlockOf(reading({ unlock: { at, exact: true } }).balances, now), null, at);
+  }
+  assert.equal(unlockOf(reading({ unlock: { at: 1795176999 as unknown as string, exact: true } }).balances, now), null);
+  // Anything but true is the scheduled kind: the wording never claims more than the answer said.
+  assert.equal(unlockOf(reading({ unlock: { at: String(local(20, 17) / 1000), exact: "yes" as unknown as boolean } }).balances, now)!.exact, false);
 });

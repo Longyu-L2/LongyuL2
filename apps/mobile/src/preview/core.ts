@@ -5,6 +5,8 @@
  *   ready:   a session can start, no boost
  *   resting: between sessions
  *   new:     an account made today, with identity checks open
+ *   posted:  nothing to claim, yesterday's rewards in a settlement that opens later today
+ *   unsettled: nothing to claim, the running day's rewards due after its settlement
  */
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import type { WalletOwner } from "../lib/wallet-key";
@@ -18,10 +20,10 @@ export class ApiError extends Error {
   }
 }
 
-type Scenario = "mining" | "ready" | "resting" | "new";
+type Scenario = "mining" | "ready" | "resting" | "new" | "posted" | "unsettled";
 const scenario = (): Scenario => {
   const s = new URLSearchParams(globalThis.location?.search ?? "").get("s");
-  return s === "ready" || s === "resting" || s === "new" ? s : "mining";
+  return s === "ready" || s === "resting" || s === "new" || s === "posted" || s === "unsettled" ? s : "mining";
 };
 
 const E18 = 10n ** 18n;
@@ -30,16 +32,20 @@ const wei = (whole: number) => (BigInt(Math.round(whole * 10_000)) * E18 / 10_00
 // A throwaway key that exists only in the preview; it never signs anything.
 const account = privateKeyToAccount(`0x${"5a".repeat(32)}`);
 
-const startedAt = (s: Scenario) => (s === "mining" ? now() - 6 * 3600 - 18 * 60 : s === "resting" ? now() - 20 * 3600 : null);
+const startedAt = (s: Scenario) =>
+  s === "mining" || s === "unsettled" ? now() - 6 * 3600 - 18 * 60 : s === "resting" || s === "posted" ? now() - 20 * 3600 : null;
 
 /** The account's balances, as both the mining status and the rewards answer carry them. */
 function balances(s: Scenario) {
   const started = startedAt(s);
   const fresh = s === "new";
+  // Nothing to claim: what the other states show as claimable is already claimed here.
+  const waiting = s === "posted" || s === "unsettled";
   return {
-    earned: wei(fresh ? 0 : 1286.4521), claimed: wei(fresh ? 0 : 1198.73), claimable: wei(fresh ? 0 : 42.7781), pending: wei(fresh ? 0 : 44.944),
+    earned: wei(fresh ? 0 : 1286.4521), claimed: wei(fresh ? 0 : waiting ? 1241.5081 : 1198.73), claimable: wei(fresh || waiting ? 0 : 42.7781), pending: wei(fresh ? 0 : 44.944),
     entitled: wei(fresh ? 0 : 1286.4521),
     accrual: started === null ? null : { perHour: wei(s === "mining" ? 1.7825 : 1.1883), until: String(started + 86_400) },
+    unlock: s === "posted" ? { at: String(now() + 2 * 3600 + 31 * 60), exact: true } : s === "unsettled" ? { at: String(now() + 26 * 3600), exact: false } : null,
     at: String(now()),
   };
 }

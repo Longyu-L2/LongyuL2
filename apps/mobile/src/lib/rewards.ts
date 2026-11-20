@@ -17,6 +17,11 @@ export interface Balances {
   pending: string;
   /** Set while a session is running: what it adds per hour, and the second it stops. */
   accrual?: { perHour: string; until: string } | null;
+  /**
+   * When pending rewards can next be claimed, in the server's seconds: to the second for a settlement
+   * that is posted, and the scheduled time for a day not settled yet. Null when no time is known.
+   */
+  unlock?: { at: string; exact: boolean } | null;
   /** The server's clock when the figures were read, in seconds. */
   at?: string;
 }
@@ -78,6 +83,37 @@ export function newer(held: Reading | null, next: Reading): Reading {
   if (!sameSession(held.balances, next.balances)) return next;
   const shown = liveBalances(held, next.receivedAt).pending;
   return liveBalances(next, next.receivedAt).pending < shown ? { ...next, floor: shown } : next;
+}
+
+/** When pending rewards can next be claimed, as the wallet words it. */
+export interface Unlock {
+  /**
+   * The day it falls on by the device's calendar. "due": the moment has come, and the balances the
+   * device holds are from before it.
+   */
+  day: "today" | "tomorrow" | "later" | "due";
+  /** The moment, at the full minute: never before the rewards can be claimed. */
+  at: Date;
+  /** False for the scheduled time of a day that is not settled yet. */
+  exact: boolean;
+}
+
+/** No settlement waits longer than this, so a time further away is not one to show. */
+const UNLOCK_HORIZON_MS = 10 * 86_400_000;
+
+/** The unlock time of `b` at `serverNowMs` on the server's clock, or null when the API gave none. */
+export function unlockOf(b: Balances, serverNowMs: number): Unlock | null {
+  const u = b.unlock;
+  if (!u || typeof u.at !== "string" || !/^\d{1,12}$/.test(u.at)) return null;
+  const ms = Number(u.at) * 1000;
+  if (ms - serverNowMs > UNLOCK_HORIZON_MS) return null;
+  const at = new Date(Math.ceil(ms / 60_000) * 60_000);
+  const exact = u.exact === true;
+  if (ms <= serverNowMs) return { day: "due", at, exact };
+  const midnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  // Rounded: a day with a clock change is an hour longer or shorter.
+  const days = Math.round((midnight(at) - midnight(new Date(serverNowMs))) / 86_400_000);
+  return { day: days <= 0 ? "today" : days === 1 ? "tomorrow" : "later", at, exact };
 }
 
 /** The parts of everything mined, each from 0 to 1, for the bar under the total. */

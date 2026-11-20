@@ -107,6 +107,12 @@ export const ConfigSchema = z.object({
    * which must also be listed in WEB_ORIGINS. Required with WEB_MINING.
    */
   WEB_AUTH_REDIRECT: z.string().max(200).optional(),
+  /**
+   * The invite bonus: each invited account that mines on a day raises its inviter's weight that
+   * day (see invites.ts). Off by default; turning it off again ends the bonus from the next
+   * settlement on, and days already settled stay as they were.
+   */
+  INVITE_REWARD: bool,
   VERIFICATION_WEBHOOK_SECRET: z.string().min(16).optional(),
 
   /** Comma-separated "name:sha256(key)" pairs for admin API access. */

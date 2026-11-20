@@ -9,9 +9,10 @@ import { api, ApiError, signOut } from "@/lib/core";
 import { useApp } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
 import { useResource } from "@/lib/resources";
-import { fill, shortAddress, tierKey } from "@/lib/format";
+import { boostPercent, fill, shortAddress, tierKey } from "@/lib/format";
+import { inviteLinkFor } from "@/lib/invite-link";
 import { colors, space } from "@/design/tokens";
-import { Avatar, Button, Callout, Card, Col, Columns, ErrorText, Header, Input, List, Metrics, Notice, Pill, Row, Screen, Section, T } from "@/components/ui";
+import { Avatar, Button, Callout, Card, Col, Columns, Divider, ErrorText, Header, Input, List, Metrics, Notice, Pill, Row, Screen, Section, T } from "@/components/ui";
 import { Sheet } from "@/components/Sheet";
 
 // Reminders are delivered through Expo's push service, which needs the project ID that `eas init`
@@ -21,19 +22,24 @@ const pushProjectId = (Constants.expoConfig?.extra as { eas?: { projectId?: stri
 // A browser shares through its own share sheet, where it has one (phones, Safari); the code can always be copied.
 const canShare = Platform.OS !== "web" || (typeof navigator !== "undefined" && typeof navigator.share === "function");
 
+/** What today's counted invites add to the account's mining, in bps. Absent from an API without the invite bonus. */
+type InviteBonus = { active: number; bps: number; bpsEach: number; capBps: number };
+
+const inviteRow = { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.sm, paddingHorizontal: space.lg, paddingVertical: 14 } as const;
+
 /** A count from the API, or a dash while it is not known. */
 const count = (v: string | number | undefined) => (v !== undefined && Number.isFinite(Number(v)) ? Number(v).toLocaleString("en-US") : "–");
 
 export default function ProfileScreen() {
   const { t, me, network, refreshMe, setSignedIn } = useApp();
-  const status = useResource<{ streakDays: number }>("/v1/mining/status").data;
+  const status = useResource<{ streakDays: number; invites?: InviteBonus }>("/v1/mining/status").data;
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
   const [appeal, setAppeal] = useState("");
   const [appealOpen, setAppealOpen] = useState(false);
   const [appealError, setAppealError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied] = useState<"" | "code" | "link">("");
 
   /** Runs one action. Its error shows on the page, or through `show` where the action sits in a sheet. */
   const run = (fn: () => Promise<void>, show: (text: string) => void = setError) => async () => {
@@ -77,12 +83,18 @@ export default function ProfileScreen() {
     setMsg(t("appealSent"));
   }, setAppealError);
 
-  const copyCode = async () => {
-    if (!me) return;
-    await Clipboard.setStringAsync(me.referralCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
+  const copy = async (what: "code" | "link", text: string) => {
+    await Clipboard.setStringAsync(text);
+    setCopied(what);
+    setTimeout(() => setCopied(""), 1600);
   };
+  // Closing the share sheet without sharing is not an error.
+  const share = (message: string) => void Share.share({ message }).catch(() => undefined);
+
+  // In a browser an invite is a link to this site; the app shares the code.
+  const link = me ? inviteLinkFor(me.referralCode) : "";
+  // Shown while the invite bonus is running.
+  const bonus = status?.invites && status.invites.bpsEach > 0 ? status.invites : null;
 
   const verified = Boolean(me && me.tier >= 2);
   const since = me && Number(me.createdAt) > 0 ? new Date(Number(me.createdAt) * 1000).toLocaleDateString(undefined, { month: "short", year: "numeric" }) : "";
@@ -132,15 +144,37 @@ export default function ProfileScreen() {
 
         <Col>
           <Section title={t("inviteCode")}>
-            <Card padding={0}>
-              <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: space.sm, paddingHorizontal: space.lg, paddingVertical: 14 }}>
+            <Card padding={0} style={{ gap: 0 }}>
+              <View style={inviteRow}>
                 <T variant="mono" selectable numberOfLines={1} style={{ flexGrow: 1, fontSize: 18, lineHeight: 24, letterSpacing: 3 }}>{me?.referralCode ?? "–"}</T>
-                <Button size="sm" kind="secondary" icon={copied ? "check" : "copy"} title={copied ? t("copied") : t("copy")} onPress={() => void copyCode()} />
-                {canShare ? (
-                  <Button size="sm" kind="secondary" icon="share" title={t("shareInvite")} onPress={() => me && void Share.share({ message: `${t("inviteMessage")} ${me.referralCode}` }).catch(() => undefined)} />
+                <Button size="sm" kind="secondary" icon={copied === "code" ? "check" : "copy"} title={copied === "code" ? t("copied") : t("copy")} onPress={() => me && void copy("code", me.referralCode)} />
+                {canShare && !link ? (
+                  <Button size="sm" kind="secondary" icon="share" title={t("shareInvite")} onPress={() => me && share(`${t("inviteMessage")} ${me.referralCode}`)} />
                 ) : null}
               </View>
+              {link ? (
+                <>
+                  <Divider />
+                  <View style={inviteRow}>
+                    <T variant="label" color={colors.textSoft} selectable numberOfLines={1} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 200 }}>{link.replace(/^https?:\/\//, "")}</T>
+                    <Button size="sm" kind="secondary" icon={copied === "link" ? "check" : "link"} title={copied === "link" ? t("copied") : t("copyLink")} onPress={() => void copy("link", link)} />
+                    {canShare ? <Button size="sm" kind="secondary" icon="share" title={t("shareInvite")} onPress={() => share(`${t("inviteLinkMessage")} ${link}`)} /> : null}
+                  </View>
+                </>
+              ) : null}
+              {bonus ? (
+                <Metrics
+                  bare
+                  items={[
+                    { label: t("activeToday"), value: count(bonus.active) },
+                    { label: t("inviteBonus"), value: bonus.bps > 0 ? boostPercent(bonus.bps) : "–" },
+                  ]}
+                />
+              ) : null}
             </Card>
+            {bonus ? (
+              <T variant="small" color={colors.textFaint}>{fill(t("inviteRule"), { each: boostPercent(bonus.bpsEach), cap: boostPercent(bonus.capBps) })}</T>
+            ) : null}
           </Section>
 
           <List>

@@ -78,6 +78,7 @@ function fixture(method: string, path: string): unknown {
       nextAllowedAt: s === "resting" ? String(now() + 4 * 3600 + 12 * 60) : null,
       estimatedPerHour: wei(s === "mining" ? 1.7825 : 1.1883),
       boostBps: s === "mining" ? 5000 : 0,
+      invites: s === "new" ? { active: 0, bps: 0, bpsEach: 500, capBps: 2500 } : { active: 3, bps: 1500, bpsEach: 500, capBps: 2500 },
       balances: balances(s),
     };
   }

@@ -93,7 +93,7 @@ async function main(): Promise<void> {
   // Ten miners: mixed tiers, one newcomer who verifies on day 1.
   const users = Array.from({ length: 10 }, () => privateKeyToAccount(generatePrivateKey()).address as Address);
   const miner = (i: number, tier: 0 | 1 | 2 | 3, streakDays = 0): MinerInput => ({
-    account: users[i]!, tier, streakDays, activeVerifiedInvites: 0, contributionBps: 0, held: false,
+    account: users[i]!, tier, streakDays, activeInvites: 0, contributionBps: 0, held: false,
   });
   const chainView = (claimed = new Map<Address, bigint>()): ChainView => ({
     chainId: BigInt(foundry.id), distributor: distAddr, maxRewardPerDay: 43n * E18,

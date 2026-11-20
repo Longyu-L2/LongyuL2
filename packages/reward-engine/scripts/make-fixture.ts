@@ -20,7 +20,7 @@ const schedule: ScheduleParams = {
 const distributor = "0x000000000000000000000000000000000000D157" as Address;
 const addr = (n: number): Address => `0x${(0xa000 + n).toString(16).padStart(40, "0")}` as Address;
 const m = (n: number, tier: 0 | 1 | 2 | 3, streakDays = 0): MinerInput => ({
-  account: addr(n), tier, streakDays, activeVerifiedInvites: 0, contributionBps: 0, held: false,
+  account: addr(n), tier, streakDays, activeInvites: 0, contributionBps: 0, held: false,
 });
 const chain = (ref: ChainView["referenceRoot"]): ChainView => ({
   chainId: 31337n,

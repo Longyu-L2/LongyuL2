@@ -1,11 +1,11 @@
 import { mkdirSync } from "node:fs";
 import type { Address, Hex, LocalAccount } from "viem";
-import { TESTNET_LAUNCH_PARAMS } from "@longyu/reward-engine";
 import { buildApp } from "./app.ts";
 import { loadConfig, type Config } from "./config.ts";
 import type { Deps } from "./context.ts";
 import { createPgDb, createPgliteDb } from "./db/index.ts";
 import { migrate } from "./db/migrate.ts";
+import { rewardParams } from "./invites.ts";
 import { startJobs } from "./jobs/runner.ts";
 import { systemClock } from "./lib/util.ts";
 import { androidKeyAttestation, googleRevocationList } from "./services/android-attestation.ts";
@@ -82,7 +82,7 @@ export async function createDeps(config: Config): Promise<Deps> {
     clock: systemClock,
     chain,
     schedule: await chain.readSchedule(),
-    rewards: TESTNET_LAUNCH_PARAMS,
+    rewards: rewardParams(config),
     attestation: createAttestation({ allowDev: config.ALLOW_DEV_ATTESTATION, playIntegrity, androidKey: androidKey(config), appAttest }),
     captcha: config.TURNSTILE_SECRET ? turnstile(config.TURNSTILE_SECRET) : devCaptcha,
     x: xProvider(config),

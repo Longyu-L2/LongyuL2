@@ -4,6 +4,7 @@ import { router } from "expo-router";
 import { signIn, signInFailure } from "@/lib/core";
 import { useApp } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
+import { invitedWith } from "@/lib/invite-link";
 import { embeddedBrowser } from "@/lib/x-auth";
 import { colors, radius, space } from "@/design/tokens";
 import { useWide } from "@/design/layout";
@@ -13,7 +14,8 @@ import { Pearl } from "@/components/Pearl";
 export default function SignInScreen() {
   const { t, setSignedIn, refreshMe } = useApp();
   const wide = useWide();
-  const [invite, setInvite] = useState("");
+  // Someone who came by an invite link finds its code filled in.
+  const [invite, setInvite] = useState(() => invitedWith());
   const [busy, setBusy] = useState(false);
   // In a browser the page comes back from X as a fresh load: a sign-in that failed there is reported here.
   const [error, setError] = useState(() => {

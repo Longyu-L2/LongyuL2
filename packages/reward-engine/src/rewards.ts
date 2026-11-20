@@ -29,10 +29,10 @@ export interface RewardParams {
   entitledFromTier: Tier;
   streakBpsPerDay: bigint;
   streakCapBps: bigint;
-  /** 0 at launch: Apple rule 3.1.5(v) forbids token rewards for invites. */
+  /** Added for each invited account that counts on the day (see MinerInput.activeInvites); 0 turns the bonus off. */
   referralBpsPerInvite: bigint;
   referralCapBps: bigint;
-  /** 0 at launch for the same reason; up to 1000 if enabled later. */
+  /** 0 at launch; up to 1000 if enabled later. */
   contributionCapBps: bigint;
   /** Largest paid boost honoured, in bps (10000 = +100%). */
   boostCapBps: bigint;
@@ -48,7 +48,7 @@ export const TESTNET_LAUNCH_PARAMS: RewardParams = {
   entitledFromTier: 1,
   streakBpsPerDay: 200n,
   streakCapBps: 2_000n,
-  referralBpsPerInvite: 0n,
+  referralBpsPerInvite: 500n,
   referralCapBps: 2_500n,
   contributionCapBps: 0n,
   boostCapBps: 10_000n,
@@ -69,8 +69,8 @@ export interface MinerInput {
   tier: Tier;
   /** Consecutive mining days before today, from the streak tracker. */
   streakDays: number;
-  /** Direct invites that are T2+ and mined at least 5 of the last 7 days. */
-  activeVerifiedInvites: number;
+  /** Accounts this miner invited that count on the day. The caller decides which do: they mined that day, and are not the miner again. */
+  activeInvites: number;
   /** Earned contribution bonus for the day, in bps (capped by params). */
   contributionBps: number;
   /** Held for review: earns nothing today. */
@@ -109,7 +109,7 @@ export function maxRewardPerSession(p: RewardParams): bigint {
 
 export function weightOf(p: RewardParams, m: MinerInput): bigint {
   assertNonNegativeInt(m.streakDays, "streakDays");
-  assertNonNegativeInt(m.activeVerifiedInvites, "activeVerifiedInvites");
+  assertNonNegativeInt(m.activeInvites, "activeInvites");
   assertNonNegativeInt(m.contributionBps, "contributionBps");
   assertNonNegativeInt(m.boostBps ?? 0, "boostBps");
   if (m.held) return 0n;
@@ -117,7 +117,7 @@ export function weightOf(p: RewardParams, m: MinerInput): bigint {
   if (tier === undefined) throw new Error(`unknown tier ${m.tier}`);
   if (tier === 0n) return 0n;
   const s = min(BigInt(m.streakDays) * p.streakBpsPerDay, p.streakCapBps);
-  const n = min(BigInt(m.activeVerifiedInvites) * p.referralBpsPerInvite, p.referralCapBps);
+  const n = min(BigInt(m.activeInvites) * p.referralBpsPerInvite, p.referralCapBps);
   const c = min(BigInt(m.contributionBps), p.contributionCapBps);
   const boost = min(BigInt(m.boostBps ?? 0), p.boostCapBps);
   // One division at the end, so rounding never compounds.

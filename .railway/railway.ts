@@ -191,6 +191,9 @@ export default defineRailway(() => {
       WEB_MINING: "true",
       // Where sign-in with X returns a browser to.
       WEB_AUTH_REDIRECT: `${PUBLIC_MINE_URL}/`,
+      // The invite bonus: an invited account that mines raises its inviter's weight that day.
+      // "false" ends it from the next settlement on.
+      INVITE_REWARD: "true",
       STORAGE_REGION: "auto",
       // The bucket is private and the API serves its files: this is the API's own public address
       // plus /data (the API refuses to start otherwise). It is written on-chain with every root.

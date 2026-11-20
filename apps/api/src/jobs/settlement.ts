@@ -16,6 +16,7 @@ import {
 } from "@longyu/reward-engine";
 import { currentDay, setTier, type Deps } from "../context.ts";
 import type { Queryable } from "../db/index.ts";
+import { activeInvites } from "../invites.ts";
 import { toBig } from "../lib/util.ts";
 import { runRiskRules } from "./risk.ts";
 
@@ -112,11 +113,13 @@ export async function settleNextDay(deps: Deps): Promise<bigint | null> {
      WHERE m.credited_day = $1 AND NOT u.banned`,
     [day],
   )).rows;
+  // Counted after the risk rules, so an invited account they hold today adds nothing.
+  const invites = await activeInvites(deps.db, deps, day);
   const miners: MinerInput[] = sessions.map((s) => ({
     account: payee(s.address),
     tier: Math.min(Math.max(s.tier, 0), 3) as Tier,
     streakDays: s.streak_days ?? 0,
-    activeVerifiedInvites: 0,
+    activeInvites: invites.get(s.user_id) ?? 0,
     contributionBps: 0,
     held: s.held,
     boostBps: s.boost_bps,

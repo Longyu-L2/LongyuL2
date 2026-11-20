@@ -41,7 +41,7 @@ const miner = (n: number, over: Partial<MinerInput> = {}): MinerInput => ({
   account: addr(n),
   tier: 2,
   streakDays: 0,
-  activeVerifiedInvites: 0,
+  activeInvites: 0,
   contributionBps: 0,
   held: false,
   ...over,
@@ -76,15 +76,22 @@ test("weight follows the formula and the launch caps", () => {
   // 10-day streak = +20%, capped there.
   assert.equal(weightOf(p, miner(1, { streakDays: 10 })), (24n * E18 * 12n) / 10n);
   assert.equal(weightOf(p, miner(1, { streakDays: 50 })), (24n * E18 * 12n) / 10n);
-  // Referral and contribution bonuses are zero at launch.
-  assert.equal(weightOf(p, miner(1, { activeVerifiedInvites: 5, contributionBps: 1000 })), 24n * E18);
-  // Highest launch reward: T3 with a full streak = 24 x 1.15 x 1.2 = 33.12.
+  // Each invited account that counts adds 5%, up to +25%. The contribution bonus is zero at launch.
+  assert.equal(weightOf(p, miner(1, { activeInvites: 1, contributionBps: 1000 })), (24n * E18 * 105n) / 100n);
+  assert.equal(weightOf(p, miner(1, { activeInvites: 5 })), 30n * E18);
+  assert.equal(weightOf(p, miner(1, { activeInvites: 40 })), 30n * E18);
+  // With the invite bonus switched off, invites add nothing.
+  assert.equal(weightOf({ ...p, referralBpsPerInvite: 0n }, miner(1, { activeInvites: 5 })), 24n * E18);
+  // T3 with a full streak = 24 x 1.15 x 1.2 = 33.12.
   assert.equal(weightOf(p, miner(1, { tier: 3, streakDays: 10 })), 3312n * E18 / 100n);
+  // Highest launch reward without a plan: T3, a full streak and five invites = 24 x 1.15 x 1.45 = 40.02.
+  assert.equal(weightOf(p, miner(1, { tier: 3, streakDays: 10, activeInvites: 5 })), 4002n * E18 / 100n);
+  assert.throws(() => weightOf(p, miner(1, { activeInvites: -1 })), /activeInvites/);
 });
 
 test("max reward per session fits the distributor's per-user bound", () => {
-  // Every bonus enabled later (1.15 x 1.55) and the largest boost (x2): 24 x 1.7825 x 2 = 85.56 <= 90.
-  const allOn = { ...TESTNET_LAUNCH_PARAMS, referralBpsPerInvite: 500n, contributionCapBps: 1000n };
+  // Every bonus at its cap, the contribution bonus too (1.15 x 1.55), and the largest boost (x2): 24 x 1.7825 x 2 = 85.56 <= 90.
+  const allOn = { ...TESTNET_LAUNCH_PARAMS, contributionCapBps: 1000n };
   assert.equal(maxRewardPerSession(allOn), 8556n * E18 / 100n);
   assert.ok(maxRewardPerSession(allOn) <= 90n * E18);
 });

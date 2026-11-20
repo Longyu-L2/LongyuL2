@@ -10,6 +10,7 @@ import { ATTESTATION_MAX_AGE } from "./auth.ts";
 import { assertDeviceNotLocked, assertWebMiningOn, loadDevice, recordAttestationFailure, tokenLooksValid } from "./device-wallet.ts";
 import type { AttestOutcome } from "../services/attestation.ts";
 import { boostOn } from "../boosts.ts";
+import { activeInvitesOf, inviteBonus } from "../invites.ts";
 import { SETTLE_GRACE_SECONDS } from "../jobs/settlement.ts";
 import type { RootInfo } from "../services/chain.ts";
 
@@ -85,21 +86,21 @@ async function latestStats(q: Queryable): Promise<LatestStats | undefined> {
 
 /** What one session credited to `day` is expected to earn, counted exactly as settlement will count it. */
 async function estimateFor(deps: Deps, user: UserRow, streakDays: number, day: bigint, latest: LatestStats | undefined) {
-  // That day's paid capacity counts as settlement will count it.
-  const boostBps = await boostOn(deps.db, user.id, day);
+  // That day's paid capacity and invited miners count as settlement will count them.
+  const [boostBps, invites] = await Promise.all([boostOn(deps.db, user.id, day), activeInvitesOf(deps.db, deps, user.id, day)]);
   const weight = user.banned
     ? 0n
     : weightOf(deps.rewards, {
         account: "0x0000000000000000000000000000000000000000",
         tier: Math.min(Math.max(user.tier, 0), 3) as Tier,
         streakDays,
-        activeVerifiedInvites: 0,
+        activeInvites: invites,
         contributionBps: 0,
         held: false,
         boostBps,
       });
   const perDay = latest?.scaled ? (weight * BigInt(latest.budget)) / BigInt(latest.totalWeight) : weight;
-  return { perDay, boostBps };
+  return { perDay, boostBps, invites };
 }
 
 /**
@@ -283,7 +284,7 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       deps.clock.now(),
       deps.schedule.startTime,
     );
-    const { perDay, boostBps } = await estimateFor(deps, user, streak.streak_days, currentDay(deps), latest);
+    const { perDay, boostBps, invites } = await estimateFor(deps, user, streak.streak_days, currentDay(deps), latest);
     return {
       day: currentDay(deps),
       tier: user.tier,
@@ -294,6 +295,8 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       nextAllowedAt: state.ok ? null : state.nextAllowedAt,
       estimatedPerHour: perDay / 24n,
       boostBps,
+      // Invited accounts that count today, and what they add to the rate (see invites.ts).
+      invites: inviteBonus(deps, invites),
       estimate: "Based on yesterday's participation; the final amount is fixed at settlement.",
       balances: wallet ? await rewardsOf(deps, user, wallet.address, roots, { streakDays: streak.streak_days, latest }) : null,
     };

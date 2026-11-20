@@ -21,11 +21,11 @@ r_i = floor(k × w_i)                          so Σ r_i ≤ E_d always
 | b, base reward | 24 tLONG | shown as 1 tLONG per hour |
 | τ, tier multiplier | T0 = 0, T1 = 1.0, T2 = 1.0, T3 = 1.15 | see "Tiers" |
 | s, streak | +2% per consecutive day, cap +20% | |
-| n, referral | **0 at launch** | cap +25% if enabled later |
+| n, invites | +5% for each counted invite, cap +25% | see "Invite bonus" |
 | c, contribution | **0 at launch** | cap +10% if enabled later |
 | p, mining capacity | 0 without a plan; +10% (C1) to +100% (C5) while one runs | paid in BNB on BSC; see "Mining capacity plans" |
 | E_d, daily budget | 12,000,000 tLONG | from EmissionSchedule |
-| Highest launch reward | 33.12 tLONG (T3, full streak) | 1.38 × b |
+| Highest launch reward | 40.02 tLONG (T3, full streak, five counted invites) | 1.6675 × b |
 | Per-user bound on-chain | 90 tLONG × (day + 1) | covers every bonus and the largest boost at their caps (1.7825 × 2 × b = 85.56) |
 
 ## Tiers
@@ -59,6 +59,20 @@ Miners can buy mining capacity: classes C1 to C5, each for an epoch of 7, 30 or 
 | Limits | At most +100%; at most three unpaid orders per account; boosts can be bought up to a year ahead |
 
 Migration to mainnet counts mined tLONG pro rata, so boosted mining earns a larger migration share.
+
+## Invite bonus
+
+An account that signed up with another account's invite code adds to that account's `n` on each day it counts: +5% each, at most +25% (five counted invites). The bonus is the inviter's alone, and it applies only on a day the inviter mines, because it multiplies their own weight. The daily budget does not change: a bonus raises a miner's share of it.
+
+An invited account counts on a mining day when all of this holds:
+
+- it mined that day, is not banned, is at an entitled tier and has no open hold flag;
+- its session did not run on an app install or browser the inviter has signed in on;
+- its session came from a network address other than the inviter's that day.
+
+Invited accounts that mined from one network address count once between them. A network address is an IPv4 address, or the /64 of an IPv6 address.
+
+The estimate the app shows and the settlement count with the same rule. The bonus has a deployment switch (`INVITE_REWARD` in the API's configuration): off, `n` is 0 for everyone from the next settlement on, and days already settled stay as they were.
 
 ## Streak
 

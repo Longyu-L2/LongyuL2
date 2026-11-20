@@ -39,7 +39,7 @@ The account is tied to the X account's numeric id; the username and the profile 
 |---|---|---|---|
 | `POST /v1/mining/challenge` | user | – | `challengeId, nonce, pulseRequired`. The human check is decided once per user per day, and is always required in a browser; a new challenge cancels the previous one |
 | `POST /v1/mining/start` | user | `challengeId, attestationToken, captchaToken?` | `startedAt, endsAt, creditedDay`. A phone must send `attestationToken` (`attestation_required`, 400); a browser sends `captchaToken` and no attestation |
-| `GET /v1/mining/status` | user | – | Session, streak, tier, estimated rate, `balances` (null until the account has a wallet) |
+| `GET /v1/mining/status` | user | – | Session, streak, tier, estimated rate, `balances` (null until the account has a wallet), `invites` (`active`: invited accounts counted today; `bps`: what they add to the rate; `bpsEach` and `capBps`: the rule, with `bpsEach` 0 while the invite bonus is off) |
 | `GET /v1/rewards` | user | – | The balances, `activeRootDay` and recent claims |
 | `POST /v1/rewards/claim` | user | – | Queues a gasless claim |
 | `GET /v1/rewards/proof/:address` | – | – | `chainId, distributor, day, cumulativeAmount, proof` for a direct claim |

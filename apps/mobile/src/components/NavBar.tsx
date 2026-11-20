@@ -108,9 +108,7 @@ export function NavBar({ state, emitter, navigateToTab, insets }: TabBarProps) {
       ) : null}
       {network ? (
         <View style={[styles.railItem, { height: 36 }]}>
-          <View style={{ width: 18, alignItems: "center" }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.positive }} />
-          </View>
+          <View style={{ width: 18 }} />
           <Text numberOfLines={1} style={[styles.railLabel, { color: colors.textSoft }]}>{network.chainName}</Text>
         </View>
       ) : null}

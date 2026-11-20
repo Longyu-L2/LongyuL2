@@ -282,6 +282,8 @@ test("railway: LONGYU MINE's web build is made for the live API, which sends bro
   assert.equal(literal(svc(nodes, "web").variables!.MINE_URL), new URL(back).origin);
   // The switch for mining in a browser is a declared setting: "false" turns it off.
   assert.equal(literal(api.variables!.WEB_MINING), "true");
+  // So is the switch for the invite bonus.
+  assert.equal(literal(api.variables!.INVITE_REWARD), "true");
   // The origin check's secret is entered on Railway, never written here.
   assert.notEqual(mine.variables!.ORIGIN_SECRET!.type, "literal");
 });

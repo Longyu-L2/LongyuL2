@@ -20,6 +20,7 @@ export interface Site {
   /** LONGYU's other pages, linked from the menu and the footer when set. */
   websiteUrl?: string | null;
   mineUrl?: string | null;
+  developersUrl?: string | null;
   githubUrl?: string | null;
   /** Whether the explorer is taking contract verifications. */
   verification?: boolean;
@@ -59,7 +60,7 @@ function sections(site: Site): { title: string; links: SafeHtml[] }[] {
   return [
     { title: "Explorer", links: ([["/blocks", "Blocks"], ["/txs", "Transactions"], ["/tokens", "Tokens"], ["/bridge", "Bridge activity"]] as Link[]).map(inside) },
     { title: "Network", links: network.map(outside) },
-    { title: "Developers", links: [...(site.verification ? [inside(["/verify", "Verify contract"])] : []), inside(["/api-docs", "API"]), ...(site.githubUrl ? [outside([site.githubUrl, "GitHub"])] : [])] },
+    { title: "Developers", links: [...(site.developersUrl ? [outside([site.developersUrl, "Developer guide"])] : []), ...(site.verification ? [inside(["/verify", "Verify contract"])] : []), inside(["/api-docs", "API"]), ...(site.githubUrl ? [outside([site.githubUrl, "GitHub"])] : [])] },
   ];
 }
 

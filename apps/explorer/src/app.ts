@@ -79,6 +79,7 @@ export function siteOf(config: Config, build = ""): Site {
     publicRpc: config.PUBLIC_RPC_URL ?? null,
     websiteUrl: config.WEBSITE_URL ?? null,
     mineUrl: config.MINE_URL ?? null,
+    developersUrl: config.DEVELOPERS_URL ?? null,
     githubUrl: config.GITHUB_URL ?? null,
     verification: config.VERIFICATION,
     labels,

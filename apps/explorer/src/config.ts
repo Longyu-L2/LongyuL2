@@ -28,9 +28,10 @@ export const ConfigSchema = z.object({
   BRIDGE_URL: z.string().url().default("https://testnet.longyu.network/bridge.html"),
   /** LONGYU Swap's page; the footer links to it when set. */
   SWAP_URL: z.string().url().startsWith("https://").optional(),
-  /** LONGYU's website, mining app and source code; the menu and the footer link to each one that is set. */
+  /** LONGYU's website, mining app, developer guide and source code; the menu and the footer link to each one that is set. */
   WEBSITE_URL: z.string().url().startsWith("https://").optional(),
   MINE_URL: z.string().url().startsWith("https://").optional(),
+  DEVELOPERS_URL: z.string().url().startsWith("https://").optional(),
   GITHUB_URL: z.string().url().startsWith("https://").optional(),
   /** Names for LONGYU's own contracts, as address:Label pairs, comma-separated. */
   KNOWN_ADDRESSES: z.string().default(""),

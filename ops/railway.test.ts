@@ -152,7 +152,7 @@ test("railway: the explorer's settings pass its production validation", async ()
   const explorer = svc(await graph(), "explorer");
   const declared = new Set(Object.keys(explorer.variables ?? {}));
   // Tuning knobs keep their defaults; PGLITE_DIR is development only.
-  const optional = new Set(["HOST", "START_BLOCK", "BATCH_SIZE", "POLL_MS", "RUN_INDEXER", "RATE_LIMIT", "PGLITE_DIR"]);
+  const optional = new Set(["HOST", "START_BLOCK", "BATCH_SIZE", "POLL_MS", "RUN_INDEXER", "RATE_LIMIT", "PGLITE_DIR", "VERIFY_DAILY_BYTES", "COMPILER_CACHE_DIR"]);
   for (const key of Object.keys(ExplorerConfigSchema.shape)) {
     assert.ok(declared.has(key) || optional.has(key), `explorer: ${key} is not declared in .railway/railway.ts`);
   }

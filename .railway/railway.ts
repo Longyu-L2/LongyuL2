@@ -289,7 +289,10 @@ export default defineRailway(() => {
       // The menu and the footer link to each of these that is set; GITHUB_URL once the repository is public.
       WEBSITE_URL: PUBLIC_SITE_URL,
       MINE_URL: PUBLIC_MINE_URL,
+      DEVELOPERS_URL: `${PUBLIC_SITE_URL}/developers`,
       GITHUB_URL: preserve(),
+      // Contract verification. "false" stops new verifications; sources verified before stay on their pages.
+      VERIFICATION: "true",
       // Set only behind Cloudflare: then requests without Cloudflare's secret header are refused, and
       // rate limits apply per visitor. Railway's own proxy hides visitors, so TRUST_PROXY cannot do it.
       ORIGIN_SECRET: preserve(),

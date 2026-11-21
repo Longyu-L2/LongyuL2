@@ -11,7 +11,7 @@ This is the rule set the contracts and the reward engine implement. Where any ot
   - a chain check: the phone reads a state root posted on BSC (picked by the API from the latest four) directly from BSC, rebuilds it from LONGYU's own data, and sends the parts. A state root is keccak256 of version 0, the block's state root, the storage root of the message passer at `0x4200…0016` and the block hash.
 - While a session runs and the app is open, the phone rebuilds the newest state root every 15 minutes and reports it. Each newer root counts once for the session.
 - The work does not change what a session earns: rewards follow the rules below. It makes starting sessions in bulk cost computing time, and every miner checks that the chain they are served is the one committed on BSC. A root that a phone and the API's own node both fail to rebuild is reported to operations as a disagreement between the chain and BSC.
-- Browsers must do the work now. Phones must from version 1.0.4 of the Android app; earlier versions start without it.
+- The web app and the Android app (version 1.0.4 and later) do the work, and the API requires it of both. Android 1.0.3 and earlier cannot start a session: they must be updated.
 
 ## Daily reward
 

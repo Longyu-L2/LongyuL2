@@ -217,11 +217,11 @@ export default defineRailway(() => {
       FAUCET_ADDRESS: preserve(),
       TURNSTILE_SECRET: preserve(),
       // The phones' work at the start of a session (modules/phone-work.ts): the output oracle on BSC
-      // testnet (chain/testnet/l1-deployments.json), read through L1_RPC_URL. Browsers must do it;
-      // add android once the APK that does it (1.0.4) has replaced the earlier ones.
+      // testnet (chain/testnet/l1-deployments.json), read through L1_RPC_URL. Browsers and the Android
+      // app (1.0.4 and later, published 21 November 2026) must do it; earlier APKs must be updated.
       L1_OUTPUT_ORACLE: "0x2dC53f20F511Bf079167Ef013d6107787E620fE3",
       WORK_BITS: "15",
-      PHONE_WORK_PLATFORMS: "web",
+      PHONE_WORK_PLATFORMS: "web,android",
       // The X developer app: its OAuth 2.0 client, and this API's /v1/auth/x/callback as registered there.
       X_CLIENT_ID: preserve(),
       X_CLIENT_SECRET: preserve(),

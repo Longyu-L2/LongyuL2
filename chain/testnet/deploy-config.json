@@ -15,7 +15,7 @@
   "l2OutputOracleStartingTimestamp": 1795002227,
   "l2OutputOracleProposer": "0x4c85BFA47Fc6c837DbEd9b1690381eD1260FEAB5",
   "l2OutputOracleChallenger": "0xaec9643e4f011e8343B61C44675ac107A73267bF",
-  "finalizationPeriodSeconds": 604800,
+  "finalizationPeriodSeconds": 600,
   "proxyAdminOwner": "0xaec9643e4f011e8343B61C44675ac107A73267bF",
   "finalSystemOwner": "0xaec9643e4f011e8343B61C44675ac107A73267bF",
   "superchainConfigGuardian": "0xaec9643e4f011e8343B61C44675ac107A73267bF",

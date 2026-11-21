@@ -28,6 +28,16 @@ r_i = floor(k × w_i)                          so Σ r_i ≤ E_d always
 | Highest launch reward | 40.02 tLONG (T3, full streak, five counted invites) | 1.6675 × b |
 | Per-user bound on-chain | 90 tLONG × (day + 1) | covers every bonus and the largest boost at their caps (1.7825 × 2 × b = 85.56) |
 
+The budget is a ceiling, not an amount shared out. While the weights of everyone mining that day add up to no more than E_d, k is 1 and every miner is paid their full weight: a bonus or a plan on one account takes nothing from another, and the rest of the day's budget is not paid to anyone. Above that, every reward is scaled by the same k. With every miner at the base weight of 24:
+
+| Miners that day | Paid to each | Paid in total |
+|---|---|---|
+| 1,000 | 24 tLONG | 24,000 |
+| 100,000 | 24 tLONG | 2,400,000 |
+| 500,000 | 24 tLONG | 12,000,000 |
+| 1,000,000 | 12 tLONG | 12,000,000 |
+| 5,000,000 | 2.4 tLONG | 12,000,000 |
+
 ## Tiers
 
 | Tier | Reached by |

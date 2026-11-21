@@ -52,3 +52,4 @@ Claims need no role: anyone may submit one, and it pays only the account named i
 | `DeployPaymentRouter.s.sol` | The payment router on BSC |
 | `CreateSafe.s.sol`, `Safes.sol` | Multisig setup |
 | `HandoverLongyu.s.sol`, `HandoverBsc.s.sol` | Move ownership from the deployer to the multisigs |
+| `SetWithdrawalWait.s.sol` | Change how long a withdrawal waits on BSC, in one Safe transaction that leaves the output oracle on its own implementation |

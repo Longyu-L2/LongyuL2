@@ -12,7 +12,7 @@ It runs the rollup software BNB Chain publishes for building L2s on BSC: the BSC
 | Mining reward token | tLONG (bridged BEP-20) | LONG (bridged BEP-20) |
 | Block time | 250 ms | 250 ms |
 | State root posted to BSC | Every 3,600 L2 blocks (15 minutes) | The same |
-| Withdrawal delay to BSC | 7 days | 7 days |
+| Withdrawal wait on BSC, after the state root is posted | 10 minutes | 1 hour |
 | Chain registry entry | [registry/eip155-668801.json](registry/eip155-668801.json) | [registry/eip155-668800.json](registry/eip155-668800.json) |
 
 Addresses, launch block and wallet settings of the testnet are in [testnet/README.md](testnet/README.md).
@@ -42,7 +42,7 @@ BNB Chain's guide, [Run your own L2](https://docs.bnbchain.org/bnb-opbnb/advance
 | Sequencer window | 96,000 L1 blocks | BSC's blocks are 0.45 s, so windows counted in L1 blocks are long |
 | Channel timeout | 1,200 L1 blocks | The same |
 | Output interval | 3,600 L2 blocks | A state root every 15 minutes |
-| Finalization period | 7 days | Withdrawals to BSC wait this long |
+| Finalization period | 10 minutes | Withdrawals to BSC wait this long after their state root. Seven days at launch; changed on 21 November 2026 with [SetWithdrawalWait](../contracts/script/SetWithdrawalWait.s.sol). What a short wait costs is in [SECURITY.md](../SECURITY.md) |
 | Batcher channel duration | 300 L1 blocks | One data transaction about every two minutes; the guide's 20 blocks would post one every 9 seconds |
 | Pre-funded accounts | None | Checked by the deploy script before the genesis is written |
 | Wrapped gas token | Named Wrapped BNB (WBNB) | The stack only knows the gas token as Ether; two name functions are fixed at genesis |

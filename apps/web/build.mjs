@@ -2,7 +2,7 @@
 // page (src/swap.ts) and the Safe page (src/safe.ts) into dist/ with the API URL baked in. Usage: API_URL=https://api.example node build.mjs
 //
 // The bridge page's settings are read only from these variables. Its addresses are never guessed: when one is
-// missing or invalid, the page shows "The bridge opens when LONGYU testnet launches." and no action works.
+// missing or invalid, the page says it is unavailable and no action works.
 // Use the proxy addresses from chain/testnet/l1-deployments.json, not the implementations.
 //   L1_PORTAL           OptimismPortalProxy on BSC testnet
 //   L1_OUTPUT_ORACLE    L2OutputOracleProxy on BSC testnet

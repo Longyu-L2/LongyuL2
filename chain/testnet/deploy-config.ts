@@ -56,8 +56,8 @@ export function deployConfig(i: Inputs) {
     l2OutputOracleStartingTimestamp: i.l1.finalizedTimestamp,
     l2OutputOracleProposer: getAddress(i.proposer),
     l2OutputOracleChallenger: admin,
-    // Seven days before a withdrawal to BSC can be finalized.
-    finalizationPeriodSeconds: 604800,
+    // Ten minutes between a state root and the withdrawals it proves; testnet only (see SECURITY.md).
+    finalizationPeriodSeconds: 600,
 
     // The admin key until the Safe multisigs exist; transfer ownership to them before real value moves.
     proxyAdminOwner: admin,

@@ -42,6 +42,7 @@ Known limits of the testnet deployment, to be closed before mainnet:
 - A root's total is compared with the amount already claimed when the root is proposed, and not again when it activates. If a root that lowers the total waits while claims continue, the total can end below what was paid, and claims then stop until a later root. Nothing is overpaid.
 - The guardian's veto depends on someone looking within the challenge delay. The delay is a setting and the watch is manual on testnet.
 - `MiningDistributor.setChallengeDelay` also applies to a root that is already waiting, and a root that waited through a pause becomes claimable when the pause ends. Both are admin-only paths.
+- A withdrawal to BSC can be finalized 10 minutes after its state root is posted; the stack's usual wait is seven days. A wrong state root can be deleted only inside that window, by the challenger (the admin key), and nothing deletes one automatically. Whoever held the proposer key could post a false root and take what the bridge holds on BSC testnet, which is test BNB and tLONG. The wait was shortened on 21 November 2026 so that testers get a withdrawal back in minutes.
 - Mining on testnet does not wait for an identity check, so one person with several X accounts and devices can mine with each. That dilutes other miners' share of the fixed daily budget and cannot enlarge it. Mainnet conversion counts verified accounts only.
 - `MiningDistributor.claimMany` with the native asset would revert as a batch if one recipient refused the transfer. The deployed distributor pays an ERC-20, where this cannot happen.
 
@@ -51,5 +52,6 @@ Known limits of the testnet deployment, to be closed before mainnet:
 - Multisigs for every role above, with a timelock on upgrades and admin settings, and the handover checked on chain.
 - The distributor changes listed above: the claimed amount checked at activation, and a setting change that cannot shorten the wait of a root already posted.
 - A watch on the challenge delay that does not depend on one person, and a delay long enough for it.
+- A one-hour withdrawal wait, and with it a challenger that checks every posted state root against its own node and deletes a wrong one without a person. A wait that short is only as safe as that challenger, so it is part of the audit, and it runs on separate infrastructure from the proposer.
 - Identity verification before any conversion to LONG.
 - The sequencer, batcher and proposer keys in hardware or a key service, and a second L1 RPC provider.

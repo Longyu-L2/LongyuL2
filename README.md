@@ -79,7 +79,7 @@ flowchart LR
   explorer[LONGYU Scan] --> seq
 ```
 
-**Chain.** LONGYU runs the rollup stack BNB Chain publishes for L2s on BSC ([bnb-chain/opbnb](https://github.com/bnb-chain/opbnb), an OP Stack fork), with its own chain ID, sequencer and bridge contracts. Transaction data and state roots are posted to BSC. Withdrawals to BSC take seven days.
+**Chain.** LONGYU runs the rollup stack BNB Chain publishes for L2s on BSC ([bnb-chain/opbnb](https://github.com/bnb-chain/opbnb), an OP Stack fork), with its own chain ID, sequencer and bridge contracts. Transaction data and state roots are posted to BSC. A withdrawal to BSC takes under 30 minutes on testnet: up to 17 for the state root that contains it to reach BSC, then a 10-minute wait.
 
 **Mining.** A session in the app lasts 24 hours and counts for the UTC day it starts in. After each day closes, the reward engine computes every account's reward from the published rules, builds a Merkle tree of cumulative entitlements and posts its root on chain. The root waits out a challenge delay, during which a guardian can veto it, and then pays claims. The vault releases tokens to the distributor only as they become claimable, and never more than the emission schedule allows. The exact rules are in [docs/MINING_SPEC.md](docs/MINING_SPEC.md).
 

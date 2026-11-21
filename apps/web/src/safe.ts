@@ -100,6 +100,7 @@ else closePage(parsed.problems);
 
 /** Without a valid configuration the page shows one line and no action works. */
 function closePage(problems: string[]): void {
+  $("closed").textContent = "This page is unavailable on this address.";
   show("closed", true);
   document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("button, input, select, textarea").forEach((node) => (node.disabled = true));
   console.info(`Safe page closed: ${problems.join("; ")}.`);

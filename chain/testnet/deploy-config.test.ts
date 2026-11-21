@@ -9,7 +9,7 @@ test("deploy config: safe defaults for a public chain and opBNB's timing", () =>
   const c = deployConfig(base);
   assert.equal(c.fundDevAccounts, false, "no pre-funded development accounts");
   assert.equal(c.enableGovernance, false, "no governance token");
-  assert.equal(c.finalizationPeriodSeconds, 604800, "seven-day withdrawals");
+  assert.equal(c.finalizationPeriodSeconds, 600, "the testnet's ten-minute withdrawal wait");
   assert.deepEqual([c.l1ChainID, c.l2ChainID, c.l2BlockTime], [97, 668801, 1]);
   assert.deepEqual([c.sequencerWindowSize, c.channelTimeout, c.maxSequencerDrift], [96000, 1200, 600]);
   assert.equal(c.l2OutputOracleSubmissionInterval, 3600, "matches op-geth --pathdb.proposeblock");

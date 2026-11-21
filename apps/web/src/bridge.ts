@@ -147,6 +147,7 @@ else closeBridge(parsed.problems);
 
 /** Without a complete, valid configuration the page shows one line and no action works. */
 function closeBridge(problems: string[]): void {
+  $("closed").textContent = "The bridge is unavailable on this address.";
   show("closed", true);
   show("history", false);
   document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("#bridge button, #bridge input").forEach((node) => (node.disabled = true));

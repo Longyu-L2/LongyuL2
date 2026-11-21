@@ -40,6 +40,8 @@ Safe v1.3.0, for the admin multisigs. On BSC testnet the scripts use Safe's own 
 | MultiSendCallOnly | LONGYU | `0xA1dabEF33b3B82c7814B6D82A79e50F4AC44102B` |
 | SystemOwnerSafe (owns the rollup's upgrade rights; its only signer is the testnet admin key until the handover) | BSC testnet | `0x7b47bB59dD70457d08C5c639Edd0f7647BA9A66D` |
 
+The withdrawal wait of the output oracle was seven days at launch. On 21 November 2026 it was set to 10 minutes by `contracts/script/SetWithdrawalWait.s.sol`, in BSC testnet transaction `0x6e52c438aecd583f5b7db10e7fa1dc76755f52674c2e921c2b7dda2b0fb91080`; the oracle's implementation is the one in [l1-deployments.json](l1-deployments.json), as before. [deploy-config.json](deploy-config.json) carries the current value.
+
 LONGYU Scan runs at https://scan-testnet.longyu.network.
 
 ## Connecting a wallet

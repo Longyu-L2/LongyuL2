@@ -108,6 +108,7 @@ else closeSwap(parsed.problems);
 
 /** Without a complete, valid configuration the page shows one line and no action works. */
 function closeSwap(problems: string[]): void {
+  $("closed").textContent = "Swap is unavailable on this address.";
   show("closed", true);
   document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("#swap button, #swap input, #watch").forEach((node) => (node.disabled = true));
   console.info(`Swap closed: ${problems.join("; ")}.`);

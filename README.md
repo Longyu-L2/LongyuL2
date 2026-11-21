@@ -35,7 +35,7 @@ Contracts on LONGYU testnet:
 | Contract | Address |
 |---|---|
 | tLONG (bridged BEP-20) | `0xF4769160D6dc78F66f61F0eA1638E65d43610163` |
-| MiningDistributor | `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06` |
+| MiningDistributor | `0x35ACf3fDc2592E218FAb449697b499b5d156D886` |
 | MiningVault | `0x5c8630c2210943aF91F01774cC1CafdAf61ff097` |
 | EmissionSchedule | `0x6F11804A7993895b112A99caf774b37cEd49E096` |
 | Faucet | `0x4C48f21885eE29a9682D0bf37b0c6af544dFEE51` |

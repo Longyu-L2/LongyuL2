@@ -96,7 +96,15 @@ contract DeployMining is Script {
         d.schedule = new EmissionSchedule(p.start, p.daily, 30, 0, 4_000_000_000e18);
         d.vault = new MiningVault(p.asset, d.schedule, deployer);
         d.distributor = new MiningDistributor(
-            p.asset, d.schedule, p.maxPerDay, 12 hours, p.maxIncrease, deployer, p.publisher, p.guardian
+            p.asset,
+            d.schedule,
+            p.maxPerDay,
+            12 hours,
+            p.maxIncrease,
+            deployer,
+            p.publisher,
+            p.guardian,
+            address(0)
         );
         d.faucet = new Faucet(
             p.faucetAsset, p.admin, p.faucetSigner, p.guardian, p.faucetMaxDrip, 1 days, p.faucetDailyCap

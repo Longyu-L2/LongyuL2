@@ -343,15 +343,15 @@ export default defineRailway(() => {
       EXPLORER_URL: PUBLIC_EXPLORER_URL,
       // A keyed BSC testnet endpoint for the page's reads; the default is a free public one.
       L1_RPC_URL: preserve(),
-      // The claim page: the API behind Cloudflare, and the mining contracts of 19 November 2026
-      // (chain/testnet/README.md). REWARD_TOKEN is the bridged tLONG, the same as L2_TOKEN.
+      // The claim page: the API behind Cloudflare, and the mining contracts of 19 November 2026 with
+      // the distributor that replaced the first one on 21 November 2026 (chain/testnet/README.md). REWARD_TOKEN is the bridged tLONG, the same as L2_TOKEN.
       API_URL: "https://api-testnet.longyu.network",
       CHAIN_ID: L2_CHAIN_ID,
       CHAIN_NAME: "LONGYU Testnet",
       NATIVE_SYMBOL: "tBNB",
       RPC_URL: PUBLIC_RPC_URL,
       REWARD_TOKEN: "0xF4769160D6dc78F66f61F0eA1638E65d43610163",
-      DISTRIBUTOR: "0x096ca64cB06f555c56F67FD618684D5C2b7F9e06",
+      DISTRIBUTOR: "0x35ACf3fDc2592E218FAb449697b499b5d156D886",
       // The claim page links to where rewards are earned, and so does the landing page.
       MINE_URL: PUBLIC_MINE_URL,
     },

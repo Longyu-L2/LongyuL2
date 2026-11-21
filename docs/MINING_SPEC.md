@@ -126,9 +126,9 @@ Wallet-sweep details:
 | Growth cap | root total − previous root total ≤ `maxDailyIncrease` × days elapsed |
 | Payout cap | total paid ≤ the active root's declared total |
 | Per-user bound | leaf ≤ `maxRewardPerDay` × (day + 1) |
-| Claimed floor | root total ≥ total already claimed |
+| Claimed floor | root total ≥ total already claimed, checked when the root is posted and again when it activates; a root below it at activation is dropped and the root before it stays claimable |
 | Ordering | one root per closed UTC day, strictly increasing, one waiting at a time |
-| Veto window | 12 hours; the guardian can veto a waiting root |
+| Veto window | 12 hours; the guardian can veto a waiting root. The wait is fixed when the root is posted: a setting change can lengthen it, not shorten it |
 | Pause | the guardian pauses; only the admin (timelock) unpauses; nothing matures while paused |
 | Replay protection | leaf = keccak256(keccak256(abi.encode(chainId, distributor, account, cumulative))) |
 

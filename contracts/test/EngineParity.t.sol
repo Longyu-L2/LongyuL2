@@ -50,7 +50,7 @@ contract EngineParityTest is Test {
         EmissionSchedule schedule = new EmissionSchedule(f.start, f.daily, 30, 0, 4_000_000_000e18);
         deployCodeTo(
             "MiningDistributor.sol:MiningDistributor",
-            abi.encode(address(0), schedule, 43e18, 12 hours, 200e18, admin, publisher, guardian),
+            abi.encode(address(0), schedule, 43e18, 12 hours, 200e18, admin, publisher, guardian, address(0)),
             f.distributor
         );
         dist = MiningDistributor(payable(f.distributor));

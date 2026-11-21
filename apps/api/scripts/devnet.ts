@@ -78,7 +78,7 @@ async function deployDevnet(RPC: string): Promise<Record<string, string>> {
   const schedule = await deploy(emissionScheduleAbi, emissionScheduleBytecode, [start, 12_000_000n * E18, 30n, 0n, 4_000_000_000n * E18]);
   const vault = await deploy(miningVaultAbi, miningVaultBytecode, [tlong, schedule, accounts.admin.address]);
   const distributor = await deploy(miningDistributorAbi, miningDistributorBytecode, [
-    tlong, schedule, 90n * E18, 3600n, 24_000_000n * E18, accounts.admin.address, accounts.publisher.address, accounts.admin.address,
+    tlong, schedule, 90n * E18, 3600n, 24_000_000n * E18, accounts.admin.address, accounts.publisher.address, accounts.admin.address, zero,
   ]);
   const faucet = await deploy(faucetAbi, faucetBytecode, [zero, accounts.admin.address, accounts.faucetSigner.address, accounts.admin.address, parseEther("0.001"), 86_400n, parseEther("10")]);
   await write(vault, miningVaultAbi, "setDistributor", [distributor]);

@@ -43,8 +43,9 @@ abstract contract MiningDistributorTestBase is Test {
         schedule = new EmissionSchedule(START, DAILY, 30, 0, POOL);
         address asset = _asset();
         vault = new MiningVault(asset, schedule, admin);
-        dist =
-            new MiningDistributor(asset, schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian);
+        dist = new MiningDistributor(
+            asset, schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian, address(0)
+        );
         vm.startPrank(admin);
         vault.setDistributor(address(dist));
         dist.setVault(vault);
@@ -459,6 +460,166 @@ abstract contract MiningDistributorTestBase is Test {
         assertEq(dist.activeRoot().root, root);
     }
 
+    // ------------------------------------------------- activation and waiting
+
+    function test_RootBelowClaimedAtActivationIsDropped() public {
+        _set3(24e18, 30e18, 12e18);
+        bytes32 first = _postAndActivate(0);
+        bytes32[] memory carolProof = _proof(2);
+        dist.claim(alice, 24e18, _proof(0));
+        dist.claim(bob, 30e18, _proof(1));
+        // A lower root passes the check at posting (55 >= 54 claimed)...
+        _set3(24e18, 30e18, 1e18);
+        bytes32 lower = _post(1);
+        // ...and claims under the active root carry the total past it while it waits.
+        dist.claim(carol, 12e18, carolProof);
+        assertEq(dist.totalClaimed(), 66e18);
+        vm.warp(block.timestamp + DELAY);
+        assertEq(dist.activeRoot().root, first, "the view already leaves the lower root out");
+        assertEq(dist.pendingRoot().root, bytes32(0));
+        vm.expectEmit(address(dist));
+        emit MiningDistributor.RootDropped(1, lower, 55e18, 66e18);
+        dist.promote();
+        assertEq(dist.activeRoot().root, first);
+        assertEq(dist.activeTotalEntitled(), 66e18);
+        assertEq(dist.pendingClaimableAt(), 0);
+        // The next root is posted and pays as usual.
+        _set3(48e18, 60e18, 24e18);
+        _postAndActivate(2);
+        assertEq(dist.claim(alice, 48e18, _proof(0)), 24e18);
+    }
+
+    function test_ShorterDelayDoesNotShortenAWaitingRoot() public {
+        _set3(24e18, 30e18, 12e18);
+        bytes32 root = _post(0);
+        uint256 due = block.timestamp + DELAY;
+        assertEq(dist.pendingClaimableAt(), due);
+        vm.prank(admin);
+        dist.setChallengeDelay(1 hours);
+        assertEq(dist.pendingClaimableAt(), due);
+        vm.warp(block.timestamp + 1 hours);
+        assertEq(dist.activeRoot().root, bytes32(0));
+        // The guardian can still veto it.
+        vm.warp(due - 1);
+        assertEq(dist.pendingRoot().root, root);
+        vm.warp(due);
+        assertEq(dist.activeRoot().root, root);
+        // The next root gets the new, shorter delay.
+        _set3(48e18, 60e18, 24e18);
+        bytes32 next = _post(1);
+        assertEq(dist.pendingClaimableAt(), block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 1 hours);
+        assertEq(dist.activeRoot().root, next);
+    }
+
+    function test_LongerDelayAppliesToAWaitingRoot() public {
+        _set3(24e18, 30e18, 12e18);
+        bytes32 root = _post(0);
+        uint256 posted = block.timestamp;
+        vm.prank(admin);
+        dist.setChallengeDelay(2 days);
+        assertEq(dist.pendingClaimableAt(), posted + 2 days);
+        vm.warp(posted + DELAY);
+        assertEq(dist.activeRoot().root, bytes32(0));
+        vm.warp(posted + 2 days);
+        assertEq(dist.activeRoot().root, root);
+    }
+
+    // ------------------------------------------------------------- carry-over
+
+    function _successor() internal returns (MiningDistributor d2) {
+        d2 = new MiningDistributor(
+            dist.asset(), schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian, address(dist)
+        );
+    }
+
+    function test_SuccessorStartsFromThePredecessorsClaims() public {
+        _set3(24e18, 30e18, 12e18);
+        _postAndActivate(0);
+        dist.claim(alice, 24e18, _proof(0));
+        dist.claim(bob, 30e18, _proof(1));
+
+        MiningDistributor d2 = _successor();
+        assertFalse(d2.carryOverComplete());
+        assertEq(address(d2.predecessor()), address(dist));
+        bytes32 root = Merkle.root(_leavesFor(d2));
+        vm.prank(publisher);
+        vm.expectRevert(MiningDistributor.CarryOverOpen.selector);
+        d2.proposeRoot(1, root, 66e18, bytes32(0), "");
+
+        address[] memory list = new address[](4);
+        (list[0], list[1], list[2], list[3]) = (alice, bob, carol, alice);
+        vm.prank(admin);
+        vm.expectRevert(MiningDistributor.PredecessorNotPaused.selector);
+        d2.carryOver(list);
+
+        vm.prank(guardian);
+        dist.pause();
+        vm.prank(alice);
+        vm.expectRevert();
+        d2.carryOver(list);
+
+        address[] memory one = new address[](1);
+        one[0] = alice;
+        vm.startPrank(admin);
+        d2.carryOver(one);
+        vm.expectRevert(abi.encodeWithSelector(MiningDistributor.CarryOverIncomplete.selector, 24e18, 54e18));
+        d2.completeCarryOver();
+        d2.carryOver(list); // alice again and carol (nothing claimed) are skipped
+        d2.completeCarryOver();
+        vm.expectRevert(MiningDistributor.CarryOverClosed.selector);
+        d2.carryOver(list);
+        vm.expectRevert(MiningDistributor.CarryOverClosed.selector);
+        d2.completeCarryOver();
+        vm.stopPrank();
+        assertTrue(d2.carryOverComplete());
+        assertEq(d2.claimed(alice), 24e18);
+        assertEq(d2.claimed(bob), 30e18);
+        assertEq(d2.claimed(carol), 0);
+        assertEq(d2.totalClaimed(), 54e18);
+
+        // The vault moves over; the float left in the old distributor is replaced once.
+        vm.startPrank(admin);
+        vault.setDistributor(address(d2));
+        d2.setVault(vault);
+        vm.stopPrank();
+        _fund(address(d2), _balanceOf(address(dist)));
+
+        _set3(48e18, 60e18, 24e18);
+        bytes32[] memory leaves = _leavesFor(d2);
+        vm.prank(publisher);
+        d2.proposeRoot(1, Merkle.root(leaves), 132e18, bytes32(0), "");
+        vm.warp(block.timestamp + DELAY);
+        assertEq(d2.claim(alice, 48e18, Merkle.proof(leaves, 0)), 24e18);
+        assertEq(d2.claim(bob, 60e18, Merkle.proof(leaves, 1)), 30e18);
+        assertEq(d2.claim(carol, 24e18, Merkle.proof(leaves, 2)), 24e18);
+        assertEq(_balanceOf(alice), 48e18);
+        assertEq(_balanceOf(bob), 60e18);
+        assertEq(_balanceOf(carol), 24e18);
+        assertEq(_balanceOf(address(d2)), 0);
+        assertEq(vault.released(), 132e18);
+        assertEq(d2.totalClaimed(), 132e18);
+    }
+
+    function test_SuccessorRefusesAnotherAsset() public {
+        address other = address(uint160(dist.asset()) + 1);
+        vm.expectRevert(MiningDistributor.PredecessorAssetMismatch.selector);
+        new MiningDistributor(
+            other, schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian, address(dist)
+        );
+    }
+
+    function test_WithoutPredecessorThereIsNoCarryOver() public {
+        assertTrue(dist.carryOverComplete());
+        address[] memory none = new address[](0);
+        vm.startPrank(admin);
+        vm.expectRevert(MiningDistributor.CarryOverClosed.selector);
+        dist.carryOver(none);
+        vm.expectRevert(MiningDistributor.CarryOverClosed.selector);
+        dist.completeCarryOver();
+        vm.stopPrank();
+    }
+
     function test_VetoWithoutPendingReverts() public {
         vm.prank(guardian);
         vm.expectRevert(MiningDistributor.NoPendingRoot.selector);
@@ -468,22 +629,24 @@ abstract contract MiningDistributorTestBase is Test {
     function test_ConstructorRejectsBadArguments() public {
         address a = dist.asset();
         vm.expectRevert(MiningDistributor.ZeroAddress.selector);
-        new MiningDistributor(a, EmissionSchedule(address(0)), 1, DELAY, 1, admin, publisher, guardian);
+        new MiningDistributor(
+            a, EmissionSchedule(address(0)), 1, DELAY, 1, admin, publisher, guardian, address(0)
+        );
         vm.expectRevert(MiningDistributor.ZeroAddress.selector);
-        new MiningDistributor(a, schedule, 1, DELAY, 1, address(0), publisher, guardian);
+        new MiningDistributor(a, schedule, 1, DELAY, 1, address(0), publisher, guardian, address(0));
         vm.expectRevert(MiningDistributor.ZeroAddress.selector);
-        new MiningDistributor(a, schedule, 1, DELAY, 1, admin, address(0), guardian);
+        new MiningDistributor(a, schedule, 1, DELAY, 1, admin, address(0), guardian, address(0));
         vm.expectRevert(MiningDistributor.ZeroAddress.selector);
-        new MiningDistributor(a, schedule, 1, DELAY, 1, admin, publisher, address(0));
+        new MiningDistributor(a, schedule, 1, DELAY, 1, admin, publisher, address(0), address(0));
         vm.expectRevert(MiningDistributor.ZeroBound.selector);
-        new MiningDistributor(a, schedule, 0, DELAY, 1, admin, publisher, guardian);
+        new MiningDistributor(a, schedule, 0, DELAY, 1, admin, publisher, guardian, address(0));
         vm.expectRevert(MiningDistributor.InvalidDelay.selector);
-        new MiningDistributor(a, schedule, 1, 1, 1, admin, publisher, guardian);
+        new MiningDistributor(a, schedule, 1, 1, 1, admin, publisher, guardian, address(0));
         vm.expectRevert(MiningDistributor.InvalidIncrease.selector);
-        new MiningDistributor(a, schedule, 1, DELAY, 0, admin, publisher, guardian);
+        new MiningDistributor(a, schedule, 1, DELAY, 0, admin, publisher, guardian, address(0));
         vm.expectRevert(MiningDistributor.InvalidIncrease.selector);
         new MiningDistributor(
-            a, schedule, 1, DELAY, uint256(type(uint128).max) + 1, admin, publisher, guardian
+            a, schedule, 1, DELAY, uint256(type(uint128).max) + 1, admin, publisher, guardian, address(0)
         );
     }
 
@@ -520,7 +683,7 @@ abstract contract MiningDistributorTestBase is Test {
         // A vault holding less than the entitlement sends what it has, and the claim then fails.
         MiningVault small = new MiningVault(dist.asset(), schedule, admin);
         MiningDistributor d2 = new MiningDistributor(
-            dist.asset(), schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian
+            dist.asset(), schedule, MAX_PER_DAY, DELAY, 2 * DAILY, admin, publisher, guardian, address(0)
         );
         vm.startPrank(admin);
         small.setDistributor(address(d2));

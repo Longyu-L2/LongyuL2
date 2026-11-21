@@ -81,7 +81,7 @@ test("backend + real contracts: mine, settle, post, relay, index, faucet, self-c
   const scheduleAddr = await deploy(emissionScheduleAbi, emissionScheduleBytecode, [schedule.startTime, schedule.initialDailyBudget, 30n, 0n, schedule.totalCap]);
   const vault = await deploy(miningVaultAbi, miningVaultBytecode, [tlong, scheduleAddr, acct.admin.address]);
   const distributor = await deploy(miningDistributorAbi, miningDistributorBytecode, [
-    tlong, scheduleAddr, 90n * E18, 12n * 3600n, 24_000_000n * E18, acct.admin.address, acct.publisher.address, acct.admin.address,
+    tlong, scheduleAddr, 90n * E18, 12n * 3600n, 24_000_000n * E18, acct.admin.address, acct.publisher.address, acct.admin.address, zero,
   ]);
   const faucet = await deploy(faucetAbi, faucetBytecode, [zero, acct.admin.address, acct.faucetSigner.address, acct.admin.address, drip, 86_400n, parseEther("1")]);
   await write(vault, miningVaultAbi, "setDistributor", [distributor]);
@@ -299,7 +299,7 @@ test("wallet sweep: real native transfers, a reverted one, and code checks on a 
   const zero = "0x0000000000000000000000000000000000000000";
   const scheduleAddr = await deployed(emissionScheduleAbi, emissionScheduleBytecode, [schedule.startTime, schedule.initialDailyBudget, 30n, 0n, schedule.totalCap]);
   const distributor = await deployed(miningDistributorAbi, miningDistributorBytecode, [
-    zero, scheduleAddr, 90n * E18, 12n * 3600n, 24_000_000n * E18, adminAcct.address, adminAcct.address, adminAcct.address,
+    zero, scheduleAddr, 90n * E18, 12n * 3600n, 24_000_000n * E18, adminAcct.address, adminAcct.address, adminAcct.address, zero,
   ]);
   const chain = createViemChain({ rpcUrl: RPC, chainId: 31337n, chainName: "LONGYU Testnet", nativeSymbol: "tBNB", distributor, bscRpcUrl: RPC, babtAddress: zero });
   const env = await makeEnv({ clock: new FakeClock(now, schedule.startTime), chain, schedule, env: { DISTRIBUTOR_ADDRESS: distributor } });

@@ -20,7 +20,7 @@ This is the day's second launch. The first (from BSC testnet block 143412595) wa
 | Rollup contracts | BSC testnet | [l1-deployments.json](l1-deployments.json) |
 | tLONG (`LongToken`, 10 billion, held by the testnet admin key) | BSC testnet | `0x88d5B1946BaB654e31Fbf0bcc3D022e995aB129C` |
 | tLONG, the bridged copy (`OptimismMintableERC20`, minted only by the bridge) | LONGYU | `0xF4769160D6dc78F66f61F0eA1638E65d43610163` |
-| MiningDistributor (pays mining rewards against the daily root) | LONGYU | `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06` |
+| MiningDistributor (pays mining rewards against the daily root) | LONGYU | `0x35ACf3fDc2592E218FAb449697b499b5d156D886` |
 | MiningVault (holds the mining pool) | LONGYU | `0x5c8630c2210943aF91F01774cC1CafdAf61ff097` |
 | EmissionSchedule (the daily budget) | LONGYU | `0x6F11804A7993895b112A99caf774b37cEd49E096` |
 | Faucet (testnet gas for new wallets) | LONGYU | `0x4C48f21885eE29a9682D0bf37b0c6af544dFEE51` |
@@ -41,6 +41,8 @@ Safe v1.3.0, for the admin multisigs. On BSC testnet the scripts use Safe's own 
 | SystemOwnerSafe (owns the rollup's upgrade rights; its only signer is the testnet admin key until the handover) | BSC testnet | `0x7b47bB59dD70457d08C5c639Edd0f7647BA9A66D` |
 
 The withdrawal wait of the output oracle was seven days at launch. On 21 November 2026 it was set to 10 minutes by `contracts/script/SetWithdrawalWait.s.sol`, in BSC testnet transaction `0x6e52c438aecd583f5b7db10e7fa1dc76755f52674c2e921c2b7dda2b0fb91080`; the oracle's implementation is the one in [l1-deployments.json](l1-deployments.json), as before. [deploy-config.json](deploy-config.json) carries the current value.
+
+The first MiningDistributor, `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06`, was replaced on 21 November 2026 by `contracts/script/ReplaceDistributor.s.sol`. It is paused for good. The new one checks the claimed total again when a root activates, and a delay change cannot shorten the wait of a root already posted. It copied every account's claimed amount from the old one on chain, and it posts no root until those amounts add up to the old total. The vault now funds it, and the admin key sent it the 24 tLONG left in the old one.
 
 LONGYU Scan runs at https://scan-testnet.longyu.network.
 

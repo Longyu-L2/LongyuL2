@@ -120,7 +120,15 @@ contract MiningInvariantTest is StdInvariant, Test {
         schedule = new EmissionSchedule(START, 12_000_000e18, 30, 0, POOL);
         vault = new MiningVault(address(0), schedule, admin);
         dist = new MiningDistributor(
-            address(0), schedule, 43e18, 12 hours, 24_000_000e18, admin, publisher, makeAddr("guardian")
+            address(0),
+            schedule,
+            43e18,
+            12 hours,
+            24_000_000e18,
+            admin,
+            publisher,
+            makeAddr("guardian"),
+            address(0)
         );
         vm.startPrank(admin);
         vault.setDistributor(address(dist));

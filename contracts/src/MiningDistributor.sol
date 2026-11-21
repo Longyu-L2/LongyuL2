@@ -9,6 +9,8 @@ import {EmissionSchedule} from "./EmissionSchedule.sol";
 import {IMiningDistributor} from "./interfaces/IMiningDistributor.sol";
 import {IMiningVault} from "./interfaces/IMiningVault.sol";
 import {AssetTransfer} from "./libraries/AssetTransfer.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title MiningDistributor
 /// @notice Pays mining rewards from a daily Merkle root of every user's cumulative entitlement.
@@ -39,6 +41,8 @@ interface IPredecessorDistributor {
 }
 
 contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     bytes32 public constant PUBLISHER_ROLE = keccak256("PUBLISHER_ROLE");
     bytes32 public constant GUARDIAN_ROLE = keccak256("GUARDIAN_ROLE");
     uint256 public constant MIN_CHALLENGE_DELAY = 1 hours;
@@ -122,6 +126,8 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
     error PredecessorAssetMismatch();
     error CarryOverIncomplete(uint256 carried, uint256 predecessorTotal);
     error StillTheVaultsDistributor();
+    error VaultAlreadySet();
+    error Retired();
 
     constructor(
         address asset_,
@@ -251,6 +257,7 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
         whenNotPaused
         returns (uint256 amount)
     {
+        _requireCurrent();
         _promoteIfMatured();
         SkipReason reason;
         (reason, amount) = _check(account, cumulativeAmount, proof);
@@ -266,6 +273,7 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
         returns (uint256 totalPaid)
     {
         if (accounts.length != amounts.length || accounts.length != proofs.length) revert LengthMismatch();
+        _requireCurrent();
         _promoteIfMatured();
         for (uint256 i; i < accounts.length; ++i) {
             (SkipReason reason, uint256 amount) = _check(accounts[i], amounts[i], proofs[i]);
@@ -322,23 +330,30 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
         emit CarryOverCompleted(total);
     }
 
-    /// @notice Once this distributor has been replaced (the vault funds another) and is paused, sends
-    ///         what it still holds back to the vault, so nothing stays locked in a retired contract.
-    ///         Anyone may call it, and the tokens can go nowhere but the vault, where they count as
-    ///         part of the unscheduled pool.
+    /// @notice Once this distributor has been replaced (the vault funds another) and is paused, gives
+    ///         what it still holds back to the vault, so nothing stays locked in a retired contract. The
+    ///         vault counts it as never released and passes it to the distributor that replaced this
+    ///         one as its claims need it. Anyone may call it; the tokens can go nowhere but the vault.
     function returnToVault() external whenPaused nonReentrant returns (uint256 amount) {
         address v = address(vault);
         if (v == address(0)) revert ZeroAddress();
+        if (asset == address(0)) revert NativeNotAccepted();
         if (vault.distributor() == address(this)) revert StillTheVaultsDistributor();
-        amount = AssetTransfer.balanceOf(asset, address(this));
+        amount = IERC20(asset).balanceOf(address(this));
         emit ReturnedToVault(v, amount);
-        if (amount > 0) AssetTransfer.send(asset, v, amount);
+        if (amount > 0) {
+            IERC20(asset).forceApprove(v, amount);
+            vault.takeBack(amount);
+        }
     }
 
     // ------------------------------------------------------------------ admin
 
+    /// @notice Sets the vault that funds this distributor, once: it can never be pointed elsewhere, so
+    ///         what this distributor holds can only ever go to its miners or back to that vault.
     function setVault(IMiningVault vault_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (address(vault_) == address(0)) revert ZeroAddress();
+        if (address(vault) != address(0)) revert VaultAlreadySet();
         vault = vault_;
         emit VaultSet(address(vault_));
     }
@@ -399,6 +414,12 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
         uint256 amount = cumulativeAmount - already;
         if (totalClaimed + amount > r.totalEntitled) return (SkipReason.AboveTotalEntitled, 0);
         return (SkipReason.None, amount);
+    }
+
+    /// A distributor the vault no longer funds has been replaced, for good: it pays nothing more, so
+    /// an account cannot claim here and again from its successor.
+    function _requireCurrent() internal view {
+        if (address(vault) != address(0) && vault.distributor() != address(this)) revert Retired();
     }
 
     function _pay(address account, uint256 cumulativeAmount, uint256 amount) internal {

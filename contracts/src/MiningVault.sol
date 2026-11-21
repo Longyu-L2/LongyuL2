@@ -7,6 +7,8 @@ import {EmissionSchedule} from "./EmissionSchedule.sol";
 import {IMiningDistributor} from "./interfaces/IMiningDistributor.sol";
 import {IMiningVault} from "./interfaces/IMiningVault.sol";
 import {AssetTransfer} from "./libraries/AssetTransfer.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title MiningVault
 /// @notice Holds the mining pool and funds the distributor only as rewards become claimable.
@@ -18,19 +20,25 @@ import {AssetTransfer} from "./libraries/AssetTransfer.sol";
 ///      can have earned yet, so funding the vault never locks tokens in it for good. Both powers are
 ///      listed in the public admin inventory.
 contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     address public immutable asset;
     EmissionSchedule public immutable schedule;
 
     address public distributor;
+    /// Sent to distributors and not given back.
     uint256 public released;
+    mapping(address account => bool) public wasDistributor;
 
     event DistributorSet(address indexed previous, address indexed current);
     event Released(address indexed distributor, uint256 amount, uint256 totalReleased);
     event Withdrawn(address indexed to, uint256 amount);
+    event TakenBack(address indexed distributor, uint256 amount);
 
     error ZeroAddress();
     error NativeNotAccepted();
     error AboveUnscheduled(uint256 amount, uint256 available);
+    error NotARetiredDistributor();
 
     constructor(address asset_, EmissionSchedule schedule_, address admin) {
         if (address(schedule_) == address(0) || admin == address(0)) revert ZeroAddress();
@@ -47,6 +55,17 @@ contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
         if (distributor_ == address(0)) revert ZeroAddress();
         emit DistributorSet(distributor, distributor_);
         distributor = distributor_;
+        wasDistributor[distributor_] = true;
+    }
+
+    /// @notice A replaced distributor gives back what it holds. It counts as never released, so the
+    ///         distributor that replaced it receives it again as its claims need it.
+    function takeBack(uint256 amount) external nonReentrant {
+        if (asset == address(0)) revert NativeNotAccepted();
+        if (!wasDistributor[msg.sender] || msg.sender == distributor) revert NotARetiredDistributor();
+        IERC20(asset).safeTransferFrom(msg.sender, address(this), amount);
+        released = amount > released ? 0 : released - amount;
+        emit TakenBack(msg.sender, amount);
     }
 
     /// @notice Amount the vault would send to the distributor right now.

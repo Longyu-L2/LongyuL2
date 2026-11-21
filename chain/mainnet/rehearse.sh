@@ -5,7 +5,8 @@
 #   chain/mainnet/rehearse.sh
 #
 # Steps, in launch order: the founders' Safe (two of three throwaway signers), the rollup deployment,
-# the handover of the upgrade rights to the timelock, and LONG minted to the Safe. Each step's own
+# and the handover of the upgrade rights to the timelock. LONG is not on BSC at launch: it is created
+# on LONGYU by mining (contracts/script/DeployMainnetMining.s.sol), and its BSC copy after the TGE. Each step's own
 # checks run; the gas each step used is reported at BSC's current gas price, so the BNB needed for
 # the real launch is known before anything is spent.
 set -euo pipefail
@@ -94,13 +95,5 @@ report "handover" "$(gas_of HandoverMainnetBsc.s.sol)"
 SAFE="$SAFE" CHALLENGER="$(addr challenger)" TIMELOCK="$TIMELOCK" DEPLOYMENTS="$DEPLOYMENTS" \
   forge script script/HandoverMainnetBsc.s.sol:HandoverMainnetBsc --sig "verify()" --rpc-url "$L1" >/dev/null
 echo "  verified: the timelock $TIMELOCK holds the upgrade rights; only the Safe proposes and runs"
-
-say "LONG, all 10 billion to the Safe"
-TREASURY="$SAFE" forge script script/LaunchLong.s.sol:LaunchLong --rpc-url "$L1" --broadcast --private-key "$(key sender)" --sender "$(addr sender)" >"$WORK/long.log" 2>&1 ||
-  { tail -30 "$WORK/long.log"; fail "the token launch failed"; }
-TOKEN=$(grep -Eo 'LONG 0x[0-9a-fA-F]{40}' "$WORK/long.log" | cut -d' ' -f2)
-TOKEN="$TOKEN" TREASURY="$SAFE" forge script script/LaunchLong.s.sol:LaunchLong --sig "verify()" --rpc-url "$L1" >/dev/null
-report "LONG" "$(gas_of LaunchLong.s.sol)"
-echo "  verified: LONG $TOKEN, 10,000,000,000 held by the Safe"
 
 say "Done. Files in $WORK"

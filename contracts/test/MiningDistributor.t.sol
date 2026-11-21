@@ -764,6 +764,14 @@ abstract contract MiningDistributorTestBase is Test {
     }
 
     function test_ARetiredDistributorReturnsItsFloatToTheVault() public {
+        if (dist.asset() == address(0)) {
+            // A native reward cannot be given back by approval: refused, before anything else.
+            vm.prank(guardian);
+            dist.pause();
+            vm.expectRevert(MiningDistributor.NativeNotAccepted.selector);
+            dist.returnToVault();
+            return;
+        }
         _set3(24e18, 30e18, 12e18);
         _postAndActivate(0);
         dist.claim(alice, 24e18, _proof(0));
@@ -782,9 +790,16 @@ abstract contract MiningDistributorTestBase is Test {
         vm.prank(guardian);
         dist.pause();
         uint256 before = vault.unscheduled();
+        uint256 releasedBefore = vault.released();
         assertEq(dist.returnToVault(), 42e18);
         assertEq(_balanceOf(address(dist)), 0);
-        assertEq(vault.unscheduled(), before + 42e18, "back in the pool the admin can recover");
+        // Counted as never released, so the successor receives it; it is not free for the admin.
+        assertEq(vault.released(), releasedBefore - 42e18);
+        assertEq(vault.unscheduled(), before);
+        // Only a retired distributor gives back.
+        vm.prank(alice);
+        vm.expectRevert(MiningVault.NotARetiredDistributor.selector);
+        vault.takeBack(0);
     }
 
     function test_VaultReturnsEverythingBeforeMiningStarts() public {

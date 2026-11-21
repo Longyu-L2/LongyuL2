@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
-# Deploys LONGYU's rollup contracts to BSC testnet and builds the chain's genesis.json and rollup.json.
-# Run on Linux with BNB Chain's opbnb repository at v0.5.6:
+# Deploys LONGYU's rollup contracts to BSC (testnet or mainnet) and builds the chain's genesis.json
+# and rollup.json. Run on Linux with BNB Chain's opbnb repository at v0.5.6:
 #
-#   MODE=rehearsal   chain/testnet/deploy-rollup.sh   # on a local fork of BSC testnet; spends nothing
-#   MODE=bsc-testnet chain/testnet/deploy-rollup.sh   # for real; spends the deployer's tBNB
+#   MODE=rehearsal         chain/testnet/deploy-rollup.sh   # testnet, on a local fork of BSC testnet; spends nothing
+#   MODE=bsc-testnet       chain/testnet/deploy-rollup.sh   # testnet, for real; spends the deployer's tBNB
+#   MODE=mainnet-rehearsal chain/testnet/deploy-rollup.sh   # mainnet, on a local fork of BSC; spends nothing
+#   MODE=bsc               chain/testnet/deploy-rollup.sh   # mainnet, for real; spends the deployer's BNB
 #
 # Needs: Go 1.25 (to build op-node), Foundry, Node 22+, python3, and SECRETS: the path of a JSON file
 # with the deployer's address and privateKey and the addresses of the sequencer, batcher and
-# proposer, each under its own name. The deployer key is read from that file and never printed.
+# proposer, each under its own name; for mainnet also the challenger's address and the founders' Safe
+# on BSC as safe.address. The deployer key is read from that file and
+# never printed. Mainnet uses its own keys file: no key of the testnet's is reused.
 set -euo pipefail
 
-MODE="${MODE:?set MODE=rehearsal or MODE=bsc-testnet}"
+MODE="${MODE:?set MODE=rehearsal, bsc-testnet, mainnet-rehearsal or bsc}"
 REPO="$(cd "$(dirname "$0")/../.." && pwd)"
 OPBNB="${OPBNB:-$HOME/longyu/opbnb}"
 BIN="${BIN:-$HOME/longyu/bin}"
 SECRETS="${SECRETS:?set SECRETS to the keys file}"
-BSC_TESTNET_RPC="${BSC_TESTNET_RPC:-https://bsc-testnet-rpc.publicnode.com}"
-# A unique CREATE2 salt: with the default one, implementation addresses already used on BSC testnet collide.
+case "$MODE" in
+  rehearsal | bsc-testnet) NETWORK=testnet L1_CHAIN=97 L2_CHAIN=668801 L1_NAME="BSC testnet" COIN=tBNB
+    L1_PUBLIC="${BSC_TESTNET_RPC:-https://bsc-testnet-rpc.publicnode.com}" ;;
+  mainnet-rehearsal | bsc) NETWORK=mainnet L1_CHAIN=56 L2_CHAIN=668800 L1_NAME="BSC" COIN=BNB
+    L1_PUBLIC="${BSC_RPC:-https://bsc-rpc.publicnode.com}" ;;
+  *) printf 'deploy-rollup: MODE must be rehearsal, bsc-testnet, mainnet-rehearsal or bsc\n' >&2; exit 1 ;;
+esac
+# A unique CREATE2 salt: with the default one, implementation addresses already used on BSC collide.
 # Every new deployment needs a salt not used before.
-IMPL_SALT="${IMPL_SALT:-longyu-668801-v3}"
+if [ "$NETWORK" = testnet ]; then IMPL_SALT="${IMPL_SALT:-longyu-668801-v3}"; else IMPL_SALT="${IMPL_SALT:-longyu-668800-v1}"; fi
 export PATH="$HOME/.local/go/bin:$HOME/.foundry/bin:$PATH"
 
 say() { printf '\n> %s\n' "$*"; }
@@ -26,7 +36,6 @@ fail() { printf 'deploy-rollup: %s\n' "$*" >&2; exit 1; }
 json() { python3 -c "import json,sys; print(json.load(open(sys.argv[1]))$2)" "$1"; }
 
 # ------------------------------------------------------------------ checks
-case "$MODE" in rehearsal | bsc-testnet) ;; *) fail "MODE must be rehearsal or bsc-testnet" ;; esac
 [ -d "$OPBNB/packages/contracts-bedrock" ] || fail "opbnb not found at $OPBNB (git clone --branch v0.5.6 https://github.com/bnb-chain/opbnb)"
 [ "$(git -C "$OPBNB" describe --tags --exact-match 2>/dev/null || git -C "$OPBNB" rev-parse HEAD)" = "v0.5.6" ] ||
   [ "$(git -C "$OPBNB" rev-parse HEAD)" = "5886d22b3c62d96af0ce7f2b8682244032d07a77" ] || fail "opbnb must be at v0.5.6"
@@ -38,17 +47,23 @@ SEQUENCER=$(json "$SECRETS" "['sequencer']['address']")
 BATCHER=$(json "$SECRETS" "['batcher']['address']")
 PROPOSER=$(json "$SECRETS" "['proposer']['address']")
 DEPLOYER_KEY=$(json "$SECRETS" "['deployer']['privateKey']")
-
-if [ "$MODE" = rehearsal ]; then
-  OUT="$HOME/longyu/rehearsal"
-  L1="http://127.0.0.1:8546"
-  BLOCK_TAG=latest
-else
-  OUT="$REPO/chain/testnet"
-  L1="$BSC_TESTNET_RPC"
-  BLOCK_TAG=finalized
-  [ ! -f "$OUT/l1-deployments.json" ] || fail "$OUT/l1-deployments.json exists: the rollup is already deployed"
+CHALLENGER="" SAFE=""
+if [ "$NETWORK" = mainnet ]; then
+  CHALLENGER=$(json "$SECRETS" "['challenger']['address']")
+  SAFE=$(json "$SECRETS" "['safe']['address']")
 fi
+
+case "$MODE" in
+  rehearsal | mainnet-rehearsal)
+    OUT="$HOME/longyu/$MODE"
+    L1="http://127.0.0.1:8546"
+    BLOCK_TAG=latest ;;
+  *)
+    OUT="$REPO/chain/$NETWORK"
+    L1="$L1_PUBLIC"
+    BLOCK_TAG=finalized
+    [ ! -f "$OUT/l1-deployments.json" ] || fail "$OUT/l1-deployments.json exists: the rollup is already deployed" ;;
+esac
 mkdir -p "$OUT" "$BIN"
 
 # ------------------------------------------------------------------ tools
@@ -95,31 +110,47 @@ open(path, "w").write(src)
 PY
 SKIP=(--skip "src/periphery/**" --skip "test/**" --skip "scripts/periphery/**")
 (cd "$BEDROCK" && forge build "${SKIP[@]}")
-CONFIG_IN="$BEDROCK/deploy-config/longyu-668801-$MODE.json"
-DEPLOYED="$BEDROCK/deployments/longyu-668801-$MODE-l1.json"
-ALLOCS="$BEDROCK/deployments/longyu-668801-$MODE-allocs.json"
+CONFIG_IN="$BEDROCK/deploy-config/longyu-$L2_CHAIN-$MODE.json"
+DEPLOYED="$BEDROCK/deployments/longyu-$L2_CHAIN-$MODE-l1.json"
+ALLOCS="$BEDROCK/deployments/longyu-$L2_CHAIN-$MODE-allocs.json"
 
 # ------------------------------------------------------------------ L1
-if [ "$MODE" = rehearsal ]; then
-  say "Starting a local fork of BSC testnet"
-  anvil --fork-url "$BSC_TESTNET_RPC" --chain-id 97 --port 8546 --silent &
-  ANVIL=$!
-  trap 'kill $ANVIL 2>/dev/null || true' EXIT
+case "$MODE" in rehearsal | mainnet-rehearsal)
+  # KEEP_FORK=1: a fork already running on port 8546 (chain/mainnet/rehearse.sh starts one and runs the
+  # later steps against it); otherwise one is started here and stopped at the end.
+  if [ "${KEEP_FORK:-}" != 1 ]; then
+    say "Starting a local fork of $L1_NAME"
+    anvil --fork-url "$L1_PUBLIC" --chain-id "$L1_CHAIN" --port 8546 --silent &
+    ANVIL=$!
+    trap 'kill $ANVIL 2>/dev/null || true' EXIT
+  fi
   for _ in $(seq 60); do cast chain-id --rpc-url "$L1" >/dev/null 2>&1 && break; sleep 1; done
-  cast rpc --rpc-url "$L1" anvil_setBalance "$DEPLOYER" 0x16345785D8A0000 >/dev/null # 0.1 tBNB, local only
-fi
-[ "$(cast chain-id --rpc-url "$L1")" = 97 ] || fail "L1 is not BSC testnet (chain 97)"
+  cast rpc --rpc-url "$L1" anvil_setBalance "$DEPLOYER" 0x16345785D8A0000 >/dev/null # 0.1 $COIN, local only
+esac
+[ "$(cast chain-id --rpc-url "$L1")" = "$L1_CHAIN" ] || fail "L1 is not $L1_NAME (chain $L1_CHAIN)"
 BALANCE=$(cast balance --rpc-url "$L1" "$DEPLOYER")
-say "Deployer $DEPLOYER holds $(cast from-wei "$BALANCE") tBNB"
-[ "$BALANCE" -ge 10000000000000000 ] || fail "deployer needs at least 0.01 tBNB"
+say "Deployer $DEPLOYER holds $(cast from-wei "$BALANCE") $COIN"
+# Wei amounts pass 64 bits above 9.2 BNB, so they are compared in python, not with the shell's -ge.
+wei_ge() { python3 -c "import sys; sys.exit(0 if int(sys.argv[1]) >= int(sys.argv[2]) else 1)" "$1" "$2"; }
+wei_sub() { python3 -c "import sys; print(int(sys.argv[1]) - int(sys.argv[2]))" "$1" "$2"; }
+wei_ge "$BALANCE" 10000000000000000 || fail "deployer needs at least 0.01 $COIN"
+if [ "$NETWORK" = mainnet ]; then
+  # The founders' Safe owns the system config, holds the pause and receives the fees from the first
+  # block, so it is checked before anything is spent: a Safe that needs two signatures or more, and that
+  # the deploying key does not sign for. CreateSafe.s.sol makes one; the handover checks it in full.
+  [ "$(cast code --rpc-url "$L1" "$SAFE")" != 0x ] || fail "the Safe $SAFE has no code on $L1_NAME: it must be the founders' Safe"
+  THRESHOLD=$(cast call --rpc-url "$L1" "$SAFE" "getThreshold()(uint256)") || fail "$SAFE is not a Safe"
+  wei_ge "$THRESHOLD" 2 || fail "the Safe $SAFE needs only $THRESHOLD signature(s); it must need at least two"
+  [ "$(cast call --rpc-url "$L1" "$SAFE" "isOwner(address)(bool)" "$DEPLOYER")" = false ] || fail "the deploying key signs for the Safe $SAFE"
+fi
 GAS_PRICE=$(cast gas-price --rpc-url "$L1")
 # The deploy scripts shell out to `cast block`, which reads its node from ETH_RPC_URL.
 export ETH_RPC_URL="$L1"
 
 # ------------------------------------------------------------------ deploy
 say "Writing the deploy config (starting from the $BLOCK_TAG BSC block)"
-L1_RPC_URL="$L1" L1_BLOCK_TAG="$BLOCK_TAG" ADMIN="$DEPLOYER" SEQUENCER="$SEQUENCER" BATCHER="$BATCHER" PROPOSER="$PROPOSER" \
-  node --experimental-strip-types --no-warnings "$REPO/chain/testnet/deploy-config.ts" > "$OUT/deploy-config.json"
+NETWORK="$NETWORK" L1_RPC_URL="$L1" L1_BLOCK_TAG="$BLOCK_TAG" ADMIN="$DEPLOYER" SEQUENCER="$SEQUENCER" BATCHER="$BATCHER" PROPOSER="$PROPOSER" \
+  CHALLENGER="$CHALLENGER" SAFE="$SAFE" node --experimental-strip-types --no-warnings "$REPO/chain/testnet/deploy-config.ts" > "$OUT/deploy-config.json"
 cp "$OUT/deploy-config.json" "$CONFIG_IN"
 rm -f "$DEPLOYED" "$ALLOCS"
 # BSC keeps a block's milliseconds in its mixHash. The L2 genesis is stamped with whole seconds, and
@@ -142,8 +173,8 @@ say "Deploying the L1 contracts (gas price $(cast from-wei "$GAS_PRICE" gwei) gw
 # an address with no code and no key, and change nothing.
 cp "$DEPLOYED" "$OUT/l1-deployments.json"
 
-SPENT=$(( BEFORE - $(cast balance --rpc-url "$L1" "$DEPLOYER") ))
-say "Deployment cost $(cast from-wei "$SPENT") tBNB"
+SPENT=$(wei_sub "$BEFORE" "$(cast balance --rpc-url "$L1" "$DEPLOYER")")
+say "Deployment cost $(cast from-wei "$SPENT") $COIN"
 
 say "Building the L2 genesis state"
 (cd "$BEDROCK" &&
@@ -158,21 +189,21 @@ ORIGIN_MS=$(block_ms "$(json "$OUT/rollup.json" "['genesis']['l1']['hash']")")
 
 # ------------------------------------------------------------------ verify
 say "Checking the results"
-python3 - "$OUT" "$ORIGIN_MS" <<'PY'
+python3 - "$OUT" "$ORIGIN_MS" "$L1_CHAIN" "$L2_CHAIN" <<'PY'
 import json, sys
-out, origin_ms = sys.argv[1], int(sys.argv[2])
+out, origin_ms, l1_chain, l2_chain = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
 rollup = json.load(open(f"{out}/rollup.json"))
 genesis = json.load(open(f"{out}/genesis.json"))
 deps = json.load(open(f"{out}/l1-deployments.json"))
 alloc = {k.lower().removeprefix("0x"): v for k, v in genesis["alloc"].items()}
 wbnb = bytes.fromhex(alloc["4200000000000000000000000000000000000006"]["code"].removeprefix("0x"))
 checks = {
-    "rollup L1 chain is BSC testnet": rollup["l1_chain_id"] == 97,
-    "rollup L2 chain is 668801": rollup["l2_chain_id"] == 668801,
-    "genesis chain is 668801": genesis["config"]["chainId"] == 668801,
+    f"rollup L1 chain is {l1_chain}": rollup["l1_chain_id"] == l1_chain,
+    f"rollup L2 chain is {l2_chain}": rollup["l2_chain_id"] == l2_chain,
+    f"genesis chain is {l2_chain}": genesis["config"]["chainId"] == l2_chain,
     "deposits go to the deployed portal": rollup["deposit_contract_address"].lower() == deps["OptimismPortalProxy"].lower(),
     "system config is the deployed one": rollup["l1_system_config_address"].lower() == deps["SystemConfigProxy"].lower(),
-    "batch inbox is LONGYU's": rollup["batch_inbox_address"].lower() == "0xff00000000000000000000000000000000668801",
+    "batch inbox is LONGYU's": rollup["batch_inbox_address"].lower() == "0xff" + str(l2_chain).zfill(38),
     # block_time is the pre-Volta setting. With Volta and Fourier active from the first block the
     # chain runs at 250 ms, which is what the deployed L2OutputOracle assumes for blocks after 0.
     "250 ms blocks from genesis": rollup["block_time"] == 1

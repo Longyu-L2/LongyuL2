@@ -37,3 +37,38 @@ test("deploy config: only a BSC block on a whole second can start the chain", ()
   assert.equal(onWholeSecond({ mixHash: `0x${"0".repeat(61)}1c2` }), false, "450 ms");
   assert.throws(() => onWholeSecond({ mixHash: "0x" }), /bad mixHash/);
 });
+
+test("deploy config: the testnet's deployed config is unchanged", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const deployed = JSON.parse(await readFile(new URL("./deploy-config.json", import.meta.url), "utf8"));
+  const c = deployConfig({
+    l1: { chainId: deployed.l1ChainID, finalizedHash: deployed.l1StartingBlockTag, finalizedTimestamp: deployed.l2OutputOracleStartingTimestamp },
+    admin: deployed.proxyAdminOwner, sequencer: deployed.p2pSequencerAddress, batcher: deployed.batchSenderAddress, proposer: deployed.l2OutputOracleProposer,
+  });
+  assert.deepEqual(c, deployed);
+});
+
+const mainnet = { ...base, network: "mainnet" as const, l1: { ...base.l1, chainId: 56 }, challenger: a(5), safe: a(6) };
+
+test("deploy config: mainnet settles on BSC with a one-hour wait and its own challenger", () => {
+  const c = deployConfig(mainnet);
+  assert.deepEqual([c.l1ChainID, c.l2ChainID, c.finalizationPeriodSeconds], [56, 668800, 3600]);
+  assert.equal(c.batchInboxAddress.toLowerCase(), "0xff00000000000000000000000000000000668800");
+  assert.equal(c.l2OutputOracleChallenger, a(5));
+  assert.deepEqual([c.baseFeeVaultRecipient, c.l1FeeVaultRecipient, c.sequencerFeeVaultRecipient], [a(6), a(6), a(6)]);
+  assert.deepEqual([c.finalSystemOwner, c.superchainConfigGuardian], [a(6), a(6)], "the Safe owns the system config and holds the pause");
+  assert.equal(c.proxyAdminOwner, a(1), "upgrades move to the timelock at the handover");
+  assert.equal(c.sequencerFeeVaultMinimumWithdrawalAmount, "0x16345785d8a0000", "fees pay out to the Safe from 0.1 BNB");
+  assert.equal(c.fundDevAccounts, false);
+});
+
+test("deploy config: mainnet refuses a missing or shared challenger and the wrong L1", () => {
+  assert.throws(() => deployConfig({ ...mainnet, challenger: undefined }), /needs a challenger/);
+  assert.throws(() => deployConfig({ ...mainnet, safe: undefined }), /founders' Safe/);
+  assert.throws(() => deployConfig({ ...mainnet, challenger: a(1) }), /five different keys/);
+  assert.throws(() => deployConfig({ ...mainnet, challenger: a(4) }), /five different keys/);
+  assert.throws(() => deployConfig({ ...mainnet, safe: a(2) }), /must not be one of the chain's keys/);
+  assert.throws(() => deployConfig({ ...mainnet, l1: base.l1 }), /settles on chain 56, not 97/);
+  assert.throws(() => deployConfig({ ...base, l1: { ...base.l1, chainId: 56 } }), /settles on chain 97, not 56/);
+  assert.throws(() => deployConfig({ ...base, challenger: a(5) }), /testnet's challenger/);
+});

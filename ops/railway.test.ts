@@ -72,7 +72,8 @@ test("railway: the project evaluates to a consistent graph", async () => {
       assert.equal(n.build?.builder, "DOCKERFILE");
       assert.ok(existsSync(repo(path)), path);
       for (const m of readFileSync(repo(path), "utf8").matchAll(/^COPY (?!--from)(\S+) /gm)) {
-        const src = m[1]!;
+        // NETWORK is a build argument that defaults to the testnet; this project builds the testnet.
+        const src = m[1]!.replace("${NETWORK}", "testnet");
         if (src === "chain/testnet/genesis.json" || src === "chain/testnet/rollup.json") {
           assert.match(readFileSync(repo("chain/testnet/README.md"), "utf8"), new RegExp(src.split("/").pop()!.replace(".", "\\.")));
         } else if (src !== "ops/monitor") {
@@ -295,7 +296,8 @@ test("railway: services get what their entrypoints require", async () => {
   for (const name of ["op-geth", "op-node", "op-batcher", "op-proposer"]) {
     const script = readFileSync(repo(`chain/railway/${name}/entrypoint.sh`), "utf8");
     const used = new Set([...script.matchAll(/\$\{([A-Z0-9_]+)(:-|#|\})/g)].map((m) => m[1]!));
-    for (const local of ["DATA_DIR", "CHAIN_DIR", "TMPDIR"]) used.delete(local);
+    // ROLE defaults to the sequencer; only the watchtower's own node sets it (verifier).
+    for (const local of ["DATA_DIR", "CHAIN_DIR", "TMPDIR", "ROLE"]) used.delete(local);
     const declared = new Set(Object.keys(svc(nodes, name).variables ?? {}));
     for (const v of used) assert.ok(declared.has(v), `${name} uses ${v} but Railway does not set it`);
   }

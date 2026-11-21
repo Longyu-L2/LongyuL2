@@ -5,6 +5,8 @@
 #   namespaces stay on the private WebSocket port (8546) and the authenticated engine port (8551).
 # - gcmode full, not archive: the path state scheme keeps no archive, and Railway volumes are small.
 # - No peers (--nodiscover, --maxpeers 0): this node is the only one, and Railway has no public UDP.
+# ROLE=verifier runs it for the watchtower's own node instead: it builds no blocks, only those its
+# op-node derives from BSC, and keeps the same proofs so that node can rebuild every state root.
 set -eu
 
 DATA_DIR="${DATA_DIR:-/db}"
@@ -14,7 +16,12 @@ is_hex() { printf '%s' "$1" | grep -Eq "^(0x)?[0-9a-fA-F]{$2}\$"; }
 
 [ -n "${L2_CHAIN_ID:-}" ] || fail "L2_CHAIN_ID is required"
 case "$L2_CHAIN_ID" in *[!0-9]*) fail "L2_CHAIN_ID must be a number" ;; esac
-printf '%s' "${GS_SEQUENCER_ADDRESS:-}" | grep -Eq '^0x[0-9a-fA-F]{40}$' || fail "GS_SEQUENCER_ADDRESS must be an address"
+ROLE="${ROLE:-sequencer}"
+case "$ROLE" in
+  sequencer) printf '%s' "${GS_SEQUENCER_ADDRESS:-}" | grep -Eq '^0x[0-9a-fA-F]{40}$' || fail "GS_SEQUENCER_ADDRESS must be an address" ;;
+  verifier) ;;
+  *) fail "ROLE must be sequencer or verifier" ;;
+esac
 is_hex "${ENGINE_JWT_SECRET:-}" 64 || fail "ENGINE_JWT_SECRET must be 32 bytes of hex (openssl rand -hex 32)"
 CACHE_MB="${GETH_CACHE_MB:-4096}"
 case "$CACHE_MB" in "" | *[!0-9]*) fail "GETH_CACHE_MB must be a number" ;; esac
@@ -55,13 +62,19 @@ if [ ! -d "$DATA_DIR/datadir/geth/chaindata" ]; then
   printf '%s' "$GENESIS_SHA" > "$MARK"
 fi
 
+if [ "$ROLE" = sequencer ]; then
+  set -- --mine --miner.newpayload-timeout=650ms --miner.gaslimit=150000000 --miner.gasprice=1 \
+    --miner.etherbase="$GS_SEQUENCER_ADDRESS"
+else
+  set --
+fi
+
 exec $RUN geth \
   --datadir "$DATA_DIR/datadir" \
   --http --http.addr=0.0.0.0 --http.port=8545 --http.vhosts="*" --http.corsdomain="*" --http.api=eth,net,web3 \
   --ws --ws.addr=0.0.0.0 --ws.port=8546 --ws.origins="*" --ws.api=eth,net,web3,debug,txpool \
   --syncmode=full --gcmode=full \
-  --mine --miner.newpayload-timeout=650ms --miner.gaslimit=150000000 --miner.gasprice=1 \
-  --miner.etherbase="$GS_SEQUENCER_ADDRESS" \
+  "$@" \
   --nodiscover --maxpeers=0 \
   --networkid="$L2_CHAIN_ID" \
   --authrpc.vhosts="*" --authrpc.addr=0.0.0.0 --authrpc.port=8551 --authrpc.jwtsecret="$JWT" \

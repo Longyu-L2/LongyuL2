@@ -12,7 +12,8 @@
     "apps/api",
     "apps/web",
     "apps/explorer",
-    "apps/signer"
+    "apps/signer",
+    "apps/watchtower"
   ],
   "scripts": {
     "test": "npm run test --workspaces --if-present && npm run test:ops && npm run test:rpc && cd contracts && forge test",

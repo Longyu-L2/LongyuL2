@@ -93,6 +93,7 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
     event RootDropped(uint64 indexed day, bytes32 root, uint256 totalEntitled, uint256 totalClaimed);
     event ClaimedCarriedOver(address indexed account, uint256 amount);
     event CarryOverCompleted(uint256 totalClaimed);
+    event ReturnedToVault(address indexed vault, uint256 amount);
     event Claimed(address indexed account, uint256 amount, uint256 cumulativeAmount, uint64 indexed day);
     event ClaimSkipped(address indexed account, uint256 cumulativeAmount, SkipReason reason);
     event VaultSet(address indexed vault);
@@ -120,6 +121,7 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
     error PredecessorNotPaused();
     error PredecessorAssetMismatch();
     error CarryOverIncomplete(uint256 carried, uint256 predecessorTotal);
+    error StillTheVaultsDistributor();
 
     constructor(
         address asset_,
@@ -318,6 +320,19 @@ contract MiningDistributor is IMiningDistributor, AccessControl, Pausable, Reent
         if (totalClaimed != total) revert CarryOverIncomplete(totalClaimed, total);
         carryOverComplete = true;
         emit CarryOverCompleted(total);
+    }
+
+    /// @notice Once this distributor has been replaced (the vault funds another) and is paused, sends
+    ///         what it still holds back to the vault, so nothing stays locked in a retired contract.
+    ///         Anyone may call it, and the tokens can go nowhere but the vault, where they count as
+    ///         part of the unscheduled pool.
+    function returnToVault() external whenPaused nonReentrant returns (uint256 amount) {
+        address v = address(vault);
+        if (v == address(0)) revert ZeroAddress();
+        if (vault.distributor() == address(this)) revert StillTheVaultsDistributor();
+        amount = AssetTransfer.balanceOf(asset, address(this));
+        emit ReturnedToVault(v, amount);
+        if (amount > 0) AssetTransfer.send(asset, v, amount);
     }
 
     // ------------------------------------------------------------------ admin

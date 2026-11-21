@@ -36,3 +36,6 @@ signing.properties
 *.apk
 *.aab
 ops/monitor/deployment.json
+
+# Local mainnet rehearsal (chain/mainnet/rehearse.sh)
+chain/mainnet/.rehearsal/

@@ -735,6 +735,68 @@ abstract contract MiningDistributorTestBase is Test {
         assertEq(vault.release(), 0);
     }
 
+    function test_VaultReturnsOnlyWhatNoMinerCanHaveEarned() public {
+        // Day 10 of the schedule: eleven daily budgets are owed, the rest of the pool is not.
+        uint256 owed = schedule.cumulativeBudget(schedule.currentDay());
+        assertEq(owed, 11 * DAILY);
+        assertEq(vault.unscheduled(), POOL - owed);
+        address treasury = makeAddr("treasury");
+        vm.prank(alice);
+        vm.expectRevert();
+        vault.withdrawUnscheduled(treasury, 1);
+        vm.startPrank(admin);
+        vm.expectRevert(abi.encodeWithSelector(MiningVault.AboveUnscheduled.selector, POOL - owed + 1, POOL - owed));
+        vault.withdrawUnscheduled(treasury, POOL - owed + 1);
+        vm.expectRevert(MiningVault.ZeroAddress.selector);
+        vault.withdrawUnscheduled(address(0), 1);
+        vault.withdrawUnscheduled(treasury, POOL - owed);
+        vm.stopPrank();
+        assertEq(_balanceOf(treasury), POOL - owed);
+        assertEq(vault.unscheduled(), 0);
+        // Every reward owed to date is still there and pays out.
+        _set3(24e18, 30e18, 12e18);
+        _postAndActivate(0);
+        dist.claim(alice, 24e18, _proof(0));
+        assertEq(_balanceOf(alice), 24e18);
+        // A day later one more budget is owed, and still nothing is free.
+        vm.warp(block.timestamp + 1 days);
+        assertEq(vault.unscheduled(), 0);
+    }
+
+    function test_ARetiredDistributorReturnsItsFloatToTheVault() public {
+        _set3(24e18, 30e18, 12e18);
+        _postAndActivate(0);
+        dist.claim(alice, 24e18, _proof(0));
+        assertEq(_balanceOf(address(dist)), 42e18);
+        // Still the vault's distributor, or not paused: nothing moves.
+        vm.prank(guardian);
+        dist.pause();
+        vm.expectRevert(MiningDistributor.StillTheVaultsDistributor.selector);
+        dist.returnToVault();
+        vm.prank(admin);
+        vault.setDistributor(makeAddr("successor"));
+        vm.prank(admin);
+        dist.unpause();
+        vm.expectRevert();
+        dist.returnToVault();
+        vm.prank(guardian);
+        dist.pause();
+        uint256 before = vault.unscheduled();
+        assertEq(dist.returnToVault(), 42e18);
+        assertEq(_balanceOf(address(dist)), 0);
+        assertEq(vault.unscheduled(), before + 42e18, "back in the pool the admin can recover");
+    }
+
+    function test_VaultReturnsEverythingBeforeMiningStarts() public {
+        EmissionSchedule later = new EmissionSchedule(START + 100 days, DAILY, 30, 0, POOL);
+        MiningVault early = new MiningVault(dist.asset(), later, admin);
+        _fund(address(early), 5e18);
+        assertEq(early.unscheduled(), 5e18);
+        vm.prank(admin);
+        early.withdrawUnscheduled(admin, 5e18);
+        assertEq(_balanceOf(address(early)), 0);
+    }
+
     function test_OnlyAdminSetsVaultDistributorAndDelay() public {
         vm.startPrank(alice);
         vm.expectRevert();

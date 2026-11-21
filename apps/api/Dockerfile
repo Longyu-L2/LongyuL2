@@ -10,6 +10,7 @@ COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
 COPY apps/explorer/package.json apps/explorer/
 COPY apps/signer/package.json apps/signer/
+COPY apps/watchtower/package.json apps/watchtower/
 RUN npm ci --include=dev --workspace @longyu/api --include-workspace-root=false
 
 COPY packages packages

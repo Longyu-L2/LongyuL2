@@ -90,8 +90,9 @@ library Safes {
     error SingleKeyIsOwner(address key);
 
     function kit() internal view returns (Kit memory) {
-        // BSC testnet: Safe's canonical deployment.
-        if (block.chainid == 97) {
+        // BSC and BSC testnet: Safe's canonical deployment (the same code at the same addresses, checked
+        // on both chains on 21 November 2026).
+        if (block.chainid == 56 || block.chainid == 97) {
             return Kit({
                 factory: 0xa6B71E26C5e0845f74c812102Ca7114b6a896AB2,
                 singleton: 0xd9Db270c1B5E3Bd161E8c8503c55cEABeE709552,
@@ -99,9 +100,9 @@ library Safes {
                 fallbackHandler: 0xf48f2B2d2a534e402487b3ee7C18c33Aec0Fe5e4
             });
         }
-        // LONGYU testnet: the singletons are in the genesis; the factory and the handler were deployed
-        // through the genesis SafeSingletonFactory, at Safe's addresses for that deployer.
-        if (block.chainid == 668801) {
+        // LONGYU testnet and mainnet: the singletons are in the genesis; the factory and the handler are
+        // deployed through the genesis SafeSingletonFactory, at Safe's addresses for that deployer.
+        if (block.chainid == 668801 || block.chainid == 668800) {
             return Kit({
                 factory: 0xC22834581EbC8527d974F8a1c97E1bEA4EF910BC,
                 singleton: 0x69f4D1788e39c87893C980c06EdF4b7f686e2938,

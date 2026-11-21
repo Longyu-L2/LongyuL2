@@ -58,6 +58,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test --workspace @longyu/reward-engine
       - run: npm test --workspace @longyu/signer
+      - run: npm test --workspace @longyu/watchtower
       - run: npm test --workspace @longyu/api
       - name: API end to end against Anvil
         run: npm run test:e2e --workspace @longyu/api

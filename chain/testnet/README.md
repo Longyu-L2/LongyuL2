@@ -42,7 +42,16 @@ Safe v1.3.0, for the admin multisigs. On BSC testnet the scripts use Safe's own 
 
 The withdrawal wait of the output oracle was seven days at launch. On 21 November 2026 it was set to 10 minutes by `contracts/script/SetWithdrawalWait.s.sol`, in BSC testnet transaction `0x6e52c438aecd583f5b7db10e7fa1dc76755f52674c2e921c2b7dda2b0fb91080`; the oracle's implementation is the one in [l1-deployments.json](l1-deployments.json), as before. [deploy-config.json](deploy-config.json) carries the current value.
 
-The first MiningDistributor, `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06`, was replaced on 21 November 2026 by `contracts/script/ReplaceDistributor.s.sol`. It is paused for good: afterwards the admin key gave up its admin and guardian roles on it, so nobody can unpause it. The new one checks the claimed total again when a root activates, and a delay change cannot shorten the wait of a root already posted. It copied every account's claimed amount from the old one on chain, and it posts no root until those amounts add up to the old total. The vault now funds it, and the admin key sent it the 24 tLONG left in the old one.
+The watchtower ([apps/watchtower](../../apps/watchtower)) has run on its own Railway project, with its own node, since 21 November 2026. Its two keys hold one role each:
+
+| Key | Role | Given in |
+|---|---|---|
+| `0x12081ED1E3c72cDa81E637De72A53986759341d1` | the output oracle's challenger, which deletes a wrong state root (before: the testnet admin key) | BSC testnet transaction `0x54e3a3cc1f75c43a9f8bfbfb40c150cc5b2d9e5e7f45758eed0a19b8421a0420`, by `contracts/script/SetChallenger.s.sol` |
+| `0x6CB66C6A7E1624a27fd8Fb3fF9f355c07884Ec88` | guardian of the MiningDistributor: pauses claims and vetoes a waiting root | LONGYU transaction `0x9f2319e9b290145b2405e17eb57bef94ecc516a950ebf136d048dc97b472bd71` |
+
+[deploy-config.json](deploy-config.json) still names the admin key as challenger: it is the configuration the rollup was deployed with.
+
+The first MiningDistributor, `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06`, was replaced on 21 November 2026 by `contracts/script/ReplaceDistributor.s.sol`. It is paused for good: afterwards the admin key gave up its admin and guardian roles on it, so nobody can unpause it, and the 24 tLONG it still holds stay there (the later `returnToVault` is not in its code). The new one checks the claimed total again when a root activates, and a delay change cannot shorten the wait of a root already posted. It copied every account's claimed amount from the old one on chain, and it posts no root until those amounts add up to the old total. The vault now funds it, and the admin key sent it the 24 tLONG left in the old one.
 
 LONGYU Scan runs at https://scan-testnet.longyu.network.
 

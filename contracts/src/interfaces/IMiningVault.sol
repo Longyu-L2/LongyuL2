@@ -3,4 +3,5 @@ pragma solidity 0.8.28;
 
 interface IMiningVault {
     function release() external returns (uint256);
+    function distributor() external view returns (address);
 }

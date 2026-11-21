@@ -1,0 +1,26 @@
+{
+  "name": "@longyu/watchtower",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "LONGYU watchtower: deletes wrong state roots on BSC and vetoes wrong mining roots, from its own node and with its own keys",
+  "main": "src/server.ts",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "test": "node --import tsx --test test/challenger.test.ts test/mining.test.ts test/config.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@longyu/reward-engine": "0.1.0",
+    "viem": "2.58.0",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3"
+  }
+}

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Script, console2} from "forge-std/Script.sol";
 import {ISafe, ISafeProxyFactory, Safes} from "./Safes.sol";
 
-/// @notice Creates a Safe v1.3.0 multisig on BSC testnet or LONGYU testnet. Any funded key can send it:
+/// @notice Creates a Safe v1.3.0 multisig on BSC, BSC testnet or LONGYU (testnet or mainnet). Any funded key can send it:
 ///         the sender gets no rights over the Safe.
 /// @dev Environment: OWNERS (signer addresses, comma-separated), THRESHOLD (signatures needed, at least
 ///      2), SALT_NONCE (default 0; change it to create a second Safe with the same signers).

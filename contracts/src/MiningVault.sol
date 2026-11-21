@@ -12,9 +12,11 @@ import {AssetTransfer} from "./libraries/AssetTransfer.sol";
 /// @notice Holds the mining pool and funds the distributor only as rewards become claimable.
 /// @dev The distributor's float is limited to "entitled but not yet claimed". The vault never
 ///      releases more than the schedule's cumulative budget to date, even if the distributor
-///      reports a larger entitlement. Anyone may call `release`. There is no withdraw function.
-///      The admin (a timelock) can point the vault at a new distributor; that power is listed in
-///      the public admin inventory.
+///      reports a larger entitlement. Anyone may call `release`.
+///      The admin (a timelock) can point the vault at a new distributor, and can take back only the
+///      part of the pool beyond every daily budget to date (`withdrawUnscheduled`): what no miner
+///      can have earned yet, so funding the vault never locks tokens in it for good. Both powers are
+///      listed in the public admin inventory.
 contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
     address public immutable asset;
     EmissionSchedule public immutable schedule;
@@ -24,9 +26,11 @@ contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
 
     event DistributorSet(address indexed previous, address indexed current);
     event Released(address indexed distributor, uint256 amount, uint256 totalReleased);
+    event Withdrawn(address indexed to, uint256 amount);
 
     error ZeroAddress();
     error NativeNotAccepted();
+    error AboveUnscheduled(uint256 amount, uint256 available);
 
     constructor(address asset_, EmissionSchedule schedule_, address admin) {
         if (address(schedule_) == address(0) || admin == address(0)) revert ZeroAddress();
@@ -56,6 +60,26 @@ contract MiningVault is IMiningVault, AccessControl, ReentrancyGuard {
         uint256 amount = allowed - released;
         uint256 balance = AssetTransfer.balanceOf(asset, address(this));
         return amount > balance ? balance : amount;
+    }
+
+    /// @notice What the admin may take back now: the balance beyond every daily budget to date that
+    ///         has not been released yet. Today's budget counts as owed, so nothing a miner can have
+    ///         earned, in a root or not yet settled, is ever available.
+    function unscheduled() public view returns (uint256) {
+        uint256 owed = schedule.started() ? schedule.cumulativeBudget(schedule.currentDay()) : 0;
+        owed = owed > released ? owed - released : 0;
+        uint256 balance = AssetTransfer.balanceOf(asset, address(this));
+        return balance > owed ? balance - owed : 0;
+    }
+
+    /// @notice Sends part of the unscheduled pool back, for example to the treasury. Admin only (a
+    ///         timelock, so the withdrawal is announced on chain before it can run).
+    function withdrawUnscheduled(address to, uint256 amount) external onlyRole(DEFAULT_ADMIN_ROLE) nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
+        uint256 available = unscheduled();
+        if (amount > available) revert AboveUnscheduled(amount, available);
+        emit Withdrawn(to, amount);
+        AssetTransfer.send(asset, to, amount);
     }
 
     /// @notice Sends the releasable amount to the distributor. Callable by anyone.

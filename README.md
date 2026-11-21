@@ -13,7 +13,7 @@ LONGYU is a Layer 2 network that settles on BNB Smart Chain. Gas is paid in BNB 
 
 This repository is the whole network in one place: the chain configuration, the mining contracts, the reward engine, the backend, the block explorer, the bridge and swap pages, and LONGYU MINE, the app people mine with.
 
-The network is on public testnet. The contracts have not had an external audit yet. See [SECURITY.md](SECURITY.md).
+The network is on public testnet. The contracts have not had an external audit; how they are reviewed is in [SECURITY.md](SECURITY.md).
 
 ## Testnet
 
@@ -216,7 +216,7 @@ The explorer needs no API key. There is also a form at https://scan-testnet.long
 
 Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
-What is tested today: the contracts have unit, fuzz and invariant suites; roots built by the TypeScript engine are claimed leaf by leaf against the real contract; the backend runs end to end against the contracts on a local chain. What is not done: an external audit, which comes before mainnet.
+What is tested today: the contracts have unit, fuzz and invariant suites; roots built by the TypeScript engine are claimed leaf by leaf against the real contract; the backend runs end to end against the contracts on a local chain. What is not done: an external audit. The project does not plan one; the review before mainnet is described in [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

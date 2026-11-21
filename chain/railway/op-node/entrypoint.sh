@@ -1,6 +1,12 @@
 #!/bin/sh
 # Starts op-node as the LONGYU sequencer, with the flags of BNB Chain's "Run your own L2" guide.
 # P2P runs without discovery: this is the only node, and Railway accepts no public UDP.
+# ROLE=verifier starts it instead as the watchtower's own node: it derives the chain from the batches
+# on BSC alone, with no peers and no sequencer key, and so believes nothing the sequencer says. Like
+# the sequencer it takes BSC's block hashes from its BSC endpoint (--l1.trustrpc): this software cannot
+# recompute the hashes of BSC's current headers. Give it a different BSC provider from the proposer's.
+# It polls BSC every 250 ms: this version's derivation goes idle after each BSC block without LONGYU
+# data and moves on only when told of a new BSC head, so the poll sets how fast it can catch up.
 set -eu
 
 CHAIN_DIR="${CHAIN_DIR:-/chain}"
@@ -10,7 +16,12 @@ is_hex() { printf '%s' "$1" | grep -Eq "^(0x)?[0-9a-fA-F]{$2}\$"; }
 printf '%s' "${L1_RPC_URL:-}" | grep -Eq '^https?://' || fail "L1_RPC_URL must be the BSC RPC URL"
 [ -n "${L2_ENGINE_HOST:-}" ] || fail "L2_ENGINE_HOST is required (op-geth's private domain)"
 is_hex "${ENGINE_JWT_SECRET:-}" 64 || fail "ENGINE_JWT_SECRET must be 32 bytes of hex, the same as op-geth's"
-is_hex "${GS_SEQUENCER_PRIVATE_KEY:-}" 64 || fail "GS_SEQUENCER_PRIVATE_KEY must be a 32-byte hex key"
+ROLE="${ROLE:-sequencer}"
+case "$ROLE" in
+  sequencer) is_hex "${GS_SEQUENCER_PRIVATE_KEY:-}" 64 || fail "GS_SEQUENCER_PRIVATE_KEY must be a 32-byte hex key" ;;
+  verifier) [ -z "${GS_SEQUENCER_PRIVATE_KEY:-}" ] || fail "a verifier must not hold the sequencer key" ;;
+  *) fail "ROLE must be sequencer or verifier" ;;
+esac
 [ -f "$CHAIN_DIR/rollup.json" ] || fail "$CHAIN_DIR/rollup.json is missing"
 L1_RPC_RATE_LIMIT="${L1_RPC_RATE_LIMIT:-28}"
 printf '%s' "$L1_RPC_RATE_LIMIT" | grep -Eq '^[1-9][0-9]{0,3}$' || fail "L1_RPC_RATE_LIMIT must be requests per second, 1 to 9999"
@@ -39,8 +50,22 @@ set -- \
   --l1.rpc-max-cache-size=30000 --l1.rpc-rate-limit="$L1_RPC_RATE_LIMIT" \
   --rollup.config="$CHAIN_DIR/rollup.json" \
   --rpc.addr=0.0.0.0 --rpc.port=8547 --rpc.enable-admin \
-  --p2p.sequencer.key="${GS_SEQUENCER_PRIVATE_KEY#0x}" --p2p.no-discovery \
+  --p2p.sequencer.key="${GS_SEQUENCER_PRIVATE_KEY:+${GS_SEQUENCER_PRIVATE_KEY#0x}}" --p2p.no-discovery \
   --metrics.enabled --metrics.addr=0.0.0.0 --metrics.port=7070
 if [ -n "${L1_RPC_KIND:-}" ]; then set -- "$@" --l1.rpckind="$L1_RPC_KIND"; fi
+if [ "$ROLE" = verifier ]; then
+  set -- \
+    --l1.trustrpc \
+    --l1="$L1_RPC_URL" \
+    --l2="http://$L2_ENGINE_HOST:8551" --l2.jwt-secret="$JWT" \
+    --verifier.l1-confs=15 \
+    --l1.http-poll-interval=250ms --l1.epoch-poll-interval=1s --l1.rpc-max-batch-size=20 --l1.max-concurrency=20 \
+    --l1.rpc-max-cache-size=30000 --l1.rpc-rate-limit="$L1_RPC_RATE_LIMIT" \
+    --rollup.config="$CHAIN_DIR/rollup.json" \
+    --rpc.addr=0.0.0.0 --rpc.port=8547 \
+    --p2p.disable \
+    --metrics.enabled --metrics.addr=0.0.0.0 --metrics.port=7070
+  if [ -n "${L1_RPC_KIND:-}" ]; then set -- "$@" --l1.rpckind="$L1_RPC_KIND"; fi
+fi
 
 exec op-node "$@"

@@ -129,6 +129,15 @@ export const ConfigSchema = z.object({
    * comma-separated "name:address" pairs such as "batcher:0x…,proposer:0x…".
    */
   L1_RPC_URL: z.string().url().optional(),
+  /**
+   * The rollup's L2OutputOracle on the L1. With L1_RPC_URL, phones rebuild a state root posted there
+   * to start a session, and report the newer ones they check while it runs (modules/phone-work.ts).
+   */
+  L1_OUTPUT_ORACLE: z.string().regex(/^0x[0-9a-fA-F]{40}$/).optional(),
+  /** Zero bits the session puzzle asks for; 0 turns the puzzle off. Each bit doubles the average work. */
+  WORK_BITS: z.coerce.number().int().min(0).max(24).default(15),
+  /** Devices that must do the phone work to start a session (android, ios, web, or none); others may. */
+  PHONE_WORK_PLATFORMS: z.string().regex(/^(none|(android|ios|web)(,(android|ios|web))*)$/).default("web"),
   L1_WATCH: z.string().max(600).optional(),
   /** L1 balances below this (in the L1's native token) raise a warning; below a fifth of it they are critical. */
   L1_MIN_GAS_BALANCE: z.string().regex(/^\d{1,9}(\.\d{1,18})?$/).default("0.01"),
@@ -290,6 +299,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
   if (!config.TELEGRAM_BOT_TOKEN !== !config.TELEGRAM_CHAT_ID) throw new Error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set together");
   if (!config.L1_RPC_URL !== !config.L1_WATCH) throw new Error("L1_RPC_URL and L1_WATCH are set together");
+  if (config.L1_OUTPUT_ORACLE && !config.L1_RPC_URL) throw new Error("L1_OUTPUT_ORACLE needs L1_RPC_URL");
   parseL1Watch(config.L1_WATCH);
   const rawKeys = [config.PUBLISHER_KEY, config.RELAYER_KEY, config.FAUCET_SIGNER_KEY, config.WATCH_KEY].some(Boolean);
   const kmsKeys = [config.KMS_PUBLISHER_KEY_ID, config.KMS_RELAYER_KEY_ID, config.KMS_FAUCET_SIGNER_KEY_ID].some(Boolean);

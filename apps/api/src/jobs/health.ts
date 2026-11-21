@@ -153,6 +153,20 @@ export async function computeHealth(deps: Deps): Promise<Health> {
     else add("posted roots", "critical", `${foreign.join("; ")}: ${pending && foreign[0]!.includes("pending") ? "veto it, " : ""}pause the distributor and stop the signer`);
   });
 
+  // Phones rebuild state roots posted on BSC; a root this API's own node does not rebuild either is a real disagreement.
+  await guard("chain checks", async () => {
+    const alert = (await deps.db.query<{ output_index: string; l2_block: string }>(
+      "SELECT output_index::text, l2_block::text FROM chain_check_alerts WHERE found_at > $1 ORDER BY output_index DESC LIMIT 1",
+      [now - 3n * 86_400n],
+    )).rows[0];
+    const done = (await deps.db.query<{ n: string }>(
+      "SELECT COALESCE(sum(chain_checks), 0)::text AS n FROM mining_sessions WHERE started_at > $1",
+      [now - 86_400n],
+    )).rows[0]!.n;
+    if (alert) add("chain checks", "critical", `the state root posted at index ${alert.output_index} (block ${alert.l2_block}) does not match LONGYU's own node`);
+    else add("chain checks", "ok", `${done} state roots checked by phones in sessions of the last day, no mismatch`);
+  });
+
   await guard("queues", async () => {
     const q = (await deps.db.query<{
       claims: bigint; oldest_claim: bigint | null; sent: bigint; oldest_sent: bigint | null;

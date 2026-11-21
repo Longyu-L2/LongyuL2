@@ -237,6 +237,9 @@ export async function makeEnv(
     VERIFICATION_WEBHOOK_SECRET: "whsec-0123456789abcdef",
     ADMIN_KEYS: `alice:${sha256PlainHex(ADMIN_KEYS.alice)},bob:${sha256PlainHex(ADMIN_KEYS.bob)}`,
     DATA_DIR: dataDir,
+    // A light puzzle, asked of nobody: test/phone-work.test.ts asks for the work.
+    WORK_BITS: "8",
+    PHONE_WORK_PLATFORMS: "none",
     ...opts.env,
   });
   const db = await createPgliteDb();

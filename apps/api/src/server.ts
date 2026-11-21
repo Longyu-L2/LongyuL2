@@ -17,6 +17,7 @@ import {
 } from "./services/external.ts";
 import { kmsAccount, kmsClient, localAccount, remoteAccounts, type RemoteAccounts } from "./services/signer.ts";
 import { createL1Watch, parseL1Watch } from "./services/l1.ts";
+import { createChainChecker } from "./services/chain-check.ts";
 import { createPaymentChain, paymentConfig } from "./services/payments.ts";
 
 async function signer(config: Config, key: Hex | undefined, kmsKeyId: string | undefined): Promise<LocalAccount | undefined> {
@@ -92,6 +93,9 @@ export async function createDeps(config: Config): Promise<Deps> {
     files: fileStore(config),
     payments: payments(config),
     l1: config.L1_RPC_URL && config.L1_WATCH ? createL1Watch({ rpcUrl: config.L1_RPC_URL, accounts: parseL1Watch(config.L1_WATCH) }) : undefined,
+    chainCheck: config.L1_RPC_URL && config.L1_OUTPUT_ORACLE
+      ? createChainChecker({ l1RpcUrl: config.L1_RPC_URL, oracle: config.L1_OUTPUT_ORACLE as Address, l2RpcUrl: config.RPC_URL })
+      : undefined,
   };
 }
 

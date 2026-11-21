@@ -137,6 +137,7 @@ test("railway: the API declares every setting and its literals pass production v
     STORAGE_BUCKET: "longyu-data-abc123", STORAGE_ENDPOINT: "https://t3.storageapi.dev", STORAGE_ACCESS_KEY_ID: "k", STORAGE_SECRET_ACCESS_KEY: "s",
     X_CLIENT_ID: "x-client", X_CLIENT_SECRET: "x-secret", X_REDIRECT_URI: "https://api-testnet.longyu.network/v1/auth/x/callback",
     SIGNER_TOKEN: "t".repeat(40),
+    L1_RPC_URL: "https://bsc-testnet.example", L1_WATCH: "batcher:0x0000000000000000000000000000000000000002",
   });
   const config = loadConfig(env);
   assert.equal(config.NODE_ENV, "production");
@@ -271,7 +272,8 @@ test("railway: LONGYU MINE's web build is made for the live API, which sends bro
   // and the server accepts that address for the page's content policy.
   const apiUrl = value("EXPO_PUBLIC_API_URL");
   assert.equal(`${apiUrl}/data`, literal(api.variables!.PUBLIC_DATA_BASE_URL));
-  assert.ok((contentPolicy(apiUrl) as string).includes(`connect-src 'self' ${apiUrl};`));
+  // It also calls LONGYU's public RPC and a BSC RPC for the chain check, at the addresses chain-check.json gives.
+  assert.ok((contentPolicy(apiUrl) as string).includes(`connect-src 'self' ${apiUrl} ${literal(api.variables!.PUBLIC_RPC_URL) ?? ""} https://bsc-testnet-rpc.publicnode.com;`));
   // After X, the API sends a browser back to this site, whose pages it lets call it; so may the claim page.
   const back = literal(api.variables!.WEB_AUTH_REDIRECT) ?? "";
   assert.match(back, /^https:\/\/mine-testnet\.longyu\.network\/$/);

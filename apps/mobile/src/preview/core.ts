@@ -84,7 +84,7 @@ function fixture(method: string, path: string): unknown {
     const started = startedAt(s);
     return {
       day, tier: s === "new" ? 1 : 2, streakDays: s === "new" ? 0 : 23, graceDays: s === "new" ? 0 : 2,
-      session: started === null ? null : { startedAt: String(started), endsAt: String(started + 86_400), creditedDay: String(day) },
+      session: started === null ? null : { startedAt: String(started), endsAt: String(started + 86_400), creditedDay: String(day), chainChecks: 3, lastCheckedOutput: "278" },
       canStart: s === "ready" || s === "new",
       nextAllowedAt: s === "resting" ? String(now() + 4 * 3600 + 12 * 60) : null,
       estimatedPerHour: wei(s === "mining" ? 1.7825 : 1.1883),
@@ -142,6 +142,7 @@ function fixture(method: string, path: string): unknown {
     return { entries: names.map((handle, i) => ({ rank: i + 1, handle, streakDays: 142 - i * 9, miningDays30: String(30 - Math.min(i, 6)) })) };
   }
   if (path === "/v1/mining/challenge") return { challengeId: "preview", nonce: "00", pulseRequired: false };
+  if (path === "/v1/mining/check") return { match: true, counted: false, checks: 3 };
   if (path === "/v1/boosts/orders") return { orderId: `0x${"cd".repeat(32)}`, payUrl: "https://testnet.longyu.network/pay.html?order=0x" };
   if (path === "/v1/rewards/claim") {
     if (claimStage(s) === null || claimStage(s) === "confirmed") claimAt = Date.now();

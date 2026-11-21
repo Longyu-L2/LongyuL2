@@ -8,6 +8,7 @@ import type { AttestationVerifier } from "./services/attestation.ts";
 import type { ChainGateway } from "./services/chain.ts";
 import type { Captcha, FileStore, Notifier, PushSender, XProvider } from "./services/external.ts";
 import type { L1Watch } from "./services/l1.ts";
+import type { ChainChecker } from "./services/chain-check.ts";
 import type { PaymentChain } from "./services/payments.ts";
 import { forbidden, sha256Hex, unauthorized, uuid, type Clock } from "./lib/util.ts";
 
@@ -29,6 +30,8 @@ export interface Deps {
   payments?: PaymentChain;
   /** Reader of the batcher's and proposer's gas on the L1; absent when L1_WATCH is not set. */
   l1?: L1Watch;
+  /** Reads the state roots posted on the L1 for the phones' chain checks; absent without L1_OUTPUT_ORACLE. */
+  chainCheck?: ChainChecker;
 }
 
 export interface AuthContext {
@@ -166,11 +169,11 @@ export async function consumeChallenge(
   userId: string,
   purpose: string,
   match: { id?: string; nonce?: string },
-): Promise<{ id: string; nonce: string; pulse_required: boolean }> {
-  const { rows } = await q.query<{ id: string; nonce: string; pulse_required: boolean }>(
+): Promise<{ id: string; nonce: string; pulse_required: boolean; work_bits: number | null; work_output_index: bigint | string | null }> {
+  const { rows } = await q.query<{ id: string; nonce: string; pulse_required: boolean; work_bits: number | null; work_output_index: bigint | string | null }>(
     `UPDATE challenges SET used = TRUE
      WHERE ${match.id ? "id" : "nonce"} = $1 AND user_id = $2 AND purpose = $3 AND used = FALSE AND expires_at >= $4
-     RETURNING id, nonce, pulse_required`,
+     RETURNING id, nonce, pulse_required, work_bits, work_output_index`,
     [match.id ?? match.nonce, userId, purpose, deps.clock.now()],
   );
   if (!rows[0]) throw forbidden("challenge_invalid");

@@ -6,7 +6,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 // @ts-expect-error a plain JavaScript module without type declarations
-import { contentPolicy, createHandler, lightOnly, loadSite, parseRange, ROUTES } from "./server.mjs";
+import { chainCheckOrigins, contentPolicy, createHandler, lightOnly, loadSite, parseRange, ROUTES } from "./server.mjs";
 
 const API = "https://api.example.org";
 const JS = "_expo/static/js/web/entry-0123abcd.js";
@@ -44,13 +44,13 @@ test("the page may reach its own files, the API and the human check, and nothing
   assert.equal(
     policy,
     "default-src 'none'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://pbs.twimg.com; " +
-      "font-src 'self' data:; connect-src 'self' https://api-testnet.longyu.network; frame-src https://challenges.cloudflare.com; " +
+      "font-src 'self' data:; connect-src 'self' https://api-testnet.longyu.network https://rpc-testnet.longyu.network https://bsc-testnet-rpc.publicnode.com; frame-src https://challenges.cloudflare.com; " +
       "frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'",
   );
   // Only the address's origin is taken: nothing after it can add to the policy.
-  assert.match(contentPolicy("https://api.example.org/v1; script-src *"), /connect-src 'self' https:\/\/api\.example\.org; frame-src/);
-  assert.match(contentPolicy("http://localhost:8080"), /connect-src 'self' http:\/\/localhost:8080;/);
-  assert.match(contentPolicy("http://127.0.0.1:8080"), /connect-src 'self' http:\/\/127\.0\.0\.1:8080;/);
+  assert.match(contentPolicy("https://api.example.org/v1; script-src *"), /connect-src 'self' https:\/\/api\.example\.org https:\/\/rpc-testnet\.longyu\.network https:\/\/bsc-testnet-rpc\.publicnode\.com; frame-src/);
+  assert.match(contentPolicy("http://localhost:8080"), /connect-src 'self' http:\/\/localhost:8080 /);
+  assert.match(contentPolicy("http://127.0.0.1:8080"), /connect-src 'self' http:\/\/127\.0\.0\.1:8080 /);
   for (const bad of [undefined, "", "api.example.org", "http://api.example.org", "ftp://api.example.org", "javascript:alert(1)"]) {
     assert.throws(() => contentPolicy(bad), /EXPO_PUBLIC_API_URL/, String(bad));
   }
@@ -248,4 +248,10 @@ test("behind Cloudflare, only requests carrying its secret header are served", a
   assert.equal((await fetch(`${url}/download/android`, { headers: ok, redirect: "manual" })).status, 302);
   assert.deepEqual(await bytes(await fetch(`${url}/download/${APK}`, { headers: ok })), apkBytes);
   assert.equal((await fetch(`${url}/nothing`, { headers: ok })).status, 404);
+});
+
+test("the chain check's two RPC addresses: the defaults, a build's own, and never plain http", () => {
+  assert.deepEqual(chainCheckOrigins({}), ["https://rpc-testnet.longyu.network", "https://bsc-testnet-rpc.publicnode.com"]);
+  assert.deepEqual(chainCheckOrigins({ EXPO_PUBLIC_L2_RPC_URL: "https://rpc.example.org/x", EXPO_PUBLIC_L1_RPC_URL: "https://bsc.example.org" }), ["https://rpc.example.org", "https://bsc.example.org"]);
+  assert.throws(() => chainCheckOrigins({ EXPO_PUBLIC_L1_RPC_URL: "http://bsc.example.org" }), /https/);
 });

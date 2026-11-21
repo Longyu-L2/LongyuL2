@@ -44,6 +44,11 @@ const KEYS: Record<string, StringKey> = {
   signature_invalid: "walletLinkFailed",
   // mining and rewards
   session_not_available: "sessionNotAvailable",
+  work_required: "chainCheckFailed",
+  work_invalid: "chainCheckFailed",
+  chain_check_failed: "chainCheckFailed",
+  output_unknown: "chainCheckFailed",
+  output_too_old: "chainCheckFailed",
   nothing_to_claim: "nothingToClaim",
   // capacity
   payments_unavailable: "capacityUnavailable",

@@ -13,6 +13,7 @@ import { boostOn } from "../boosts.ts";
 import { activeInvitesOf, inviteBonus } from "../invites.ts";
 import { SETTLE_GRACE_SECONDS } from "../jobs/settlement.ts";
 import type { RootInfo } from "../services/chain.ts";
+import { checkOutput, CounterSchema, PartsSchema, puzzleSolved, workRequired } from "./phone-work.ts";
 
 /** One session in seven needs a human check. */
 const PULSE_ONE_IN = 7n;
@@ -27,11 +28,13 @@ export function pulseRequired(deps: Deps, userId: string, day: bigint): boolean 
 interface LastSession {
   started_at: bigint;
   credited_day: bigint;
+  chain_checks: number;
+  last_checked_output: bigint | string | null;
 }
 
 async function lastSession(q: Queryable, userId: string): Promise<LastSession | undefined> {
   const { rows } = await q.query<LastSession>(
-    "SELECT started_at, credited_day FROM mining_sessions WHERE user_id = $1 ORDER BY started_at DESC LIMIT 1",
+    "SELECT started_at, credited_day, chain_checks, last_checked_output FROM mining_sessions WHERE user_id = $1 ORDER BY started_at DESC LIMIT 1",
     [userId],
   );
   return rows[0];
@@ -201,14 +204,24 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
     // A browser cannot prove its device, so it passes the human check at every session.
     const pulse = device.platform === "web" || pulseRequired(deps, auth.userId, state.creditedDay);
     const c = await createChallenge(deps.db, deps, auth.userId, "session", pulse);
-    return { challengeId: c.challengeId, nonce: c.nonce, pulseRequired: pulse, expiresAt: c.expiresAt };
+    // The phone's work: the puzzle on this challenge's nonce, and one of the latest state roots on BSC.
+    const bits = deps.config.WORK_BITS;
+    const output = deps.chainCheck ? await deps.chainCheck.pick().catch(() => null) : null;
+    await deps.db.query("UPDATE challenges SET work_bits = $1, work_output_index = $2 WHERE id = $3", [bits || null, output?.index ?? null, c.challengeId]);
+    const work = { bits, output: output && { index: output.index, l2Block: output.l2Block } };
+    return { challengeId: c.challengeId, nonce: c.nonce, pulseRequired: pulse, expiresAt: c.expiresAt, work };
   });
 
   app.post("/v1/mining/start", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
     const auth = await authenticate(deps, req);
     assertCountryAllowed(deps, req);
     const body = z
-      .object({ challengeId: z.uuid(), attestationToken: z.string().min(4).max(20_000).optional(), captchaToken: z.string().max(4000).optional() })
+      .object({
+        challengeId: z.uuid(),
+        attestationToken: z.string().min(4).max(20_000).optional(),
+        captchaToken: z.string().max(4000).optional(),
+        work: z.object({ counter: CounterSchema.optional(), parts: PartsSchema.optional() }).optional(),
+      })
       .parse(req.body);
     const now = deps.clock.now();
     const user = await loadUser(deps.db, auth.userId);
@@ -246,6 +259,33 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       throw forbidden("pulse_failed", "Human check failed");
     }
 
+    // The phone's work. Required of the devices in PHONE_WORK_PLATFORMS; anyone who sends it is held to it.
+    const required = workRequired(deps, device.platform);
+    if (challenge.work_bits) {
+      const counter = body.work?.counter;
+      if (counter === undefined) {
+        if (required) throw forbidden("work_required");
+      } else if (!puzzleSolved(challenge.nonce, counter, challenge.work_bits)) {
+        throw forbidden("work_invalid");
+      }
+    }
+    let checked: bigint | null = null;
+    if (challenge.work_output_index !== null && deps.chainCheck) {
+      const index = BigInt(challenge.work_output_index);
+      const parts = body.work?.parts;
+      if (!parts) {
+        if (required) throw forbidden("work_required");
+      } else {
+        // BSC out of reach is our problem, not the miner's: the session starts without the check.
+        const outcome = await checkOutput(deps, index, parts).catch((e: unknown) => {
+          req.log.warn({ err: e }, "chain check at session start could not be completed");
+          return null;
+        });
+        if (outcome === "wrong") throw forbidden("chain_check_failed");
+        if (outcome === "match") checked = index;
+      }
+    }
+
     return deps.db.tx(async (q) => {
       if (proof.signCount !== undefined) {
         // App Attest counters only move forward; a lower value means a replayed assertion.
@@ -260,13 +300,38 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       const state = await sessionState(q, deps, auth.userId);
       if (!state.ok) throw conflict("session_not_available", state.reason);
       await q.query(
-        `INSERT INTO mining_sessions (id, user_id, device_id, started_at, credited_day, ip, pulse_passed, wallet_address)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [uuid(), auth.userId, auth.deviceId, now, state.creditedDay, clientIp(deps, req), challenge.pulse_required, wallet.address],
+        `INSERT INTO mining_sessions (id, user_id, device_id, started_at, credited_day, ip, pulse_passed, wallet_address, chain_checks, last_checked_output)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+        [uuid(), auth.userId, auth.deviceId, now, state.creditedDay, clientIp(deps, req), challenge.pulse_required, wallet.address, checked === null ? 0 : 1, checked],
       );
       await q.query("UPDATE devices SET last_seen_at = $1, attestation_failures = 0 WHERE id = $2", [now, auth.deviceId]);
       return { startedAt: now, endsAt: now + 86_400n, creditedDay: state.creditedDay };
     });
+  });
+
+  /**
+   * A state root the app rebuilt while a session runs. Each newer root counts once for the session;
+   * one that disagrees with what LONGYU's own node rebuilds is refused.
+   */
+  app.post("/v1/mining/check", { config: { rateLimit: { max: 12, timeWindow: "1 hour" } } }, async (req) => {
+    const auth = await authenticate(deps, req);
+    const body = z.object({ index: z.string().regex(/^\d{1,12}$/).transform(BigInt), parts: PartsSchema }).parse(req.body);
+    const session = (await deps.db.query<{ id: string; chain_checks: number; last_checked_output: bigint | string | null }>(
+      "SELECT id, chain_checks, last_checked_output FROM mining_sessions WHERE user_id = $1 AND started_at > $2 ORDER BY started_at DESC LIMIT 1",
+      [auth.userId, deps.clock.now() - SESSION_LENGTH],
+    )).rows[0];
+    if (!session) throw conflict("no_active_session");
+    const last = session.last_checked_output === null ? null : BigInt(session.last_checked_output);
+    if (last !== null && body.index <= last) return { match: true, counted: false, checks: session.chain_checks };
+    const outcome = await checkOutput(deps, body.index, body.parts);
+    if (outcome === "wrong") throw forbidden("chain_check_failed");
+    if (outcome === "chain_mismatch") return { match: false, counted: false, checks: session.chain_checks };
+    const row = (await deps.db.query<{ chain_checks: number }>(
+      `UPDATE mining_sessions SET chain_checks = chain_checks + 1, last_checked_output = $1
+       WHERE id = $2 AND (last_checked_output IS NULL OR last_checked_output < $1) RETURNING chain_checks`,
+      [body.index, session.id],
+    )).rows[0];
+    return { match: true, counted: !!row, checks: row?.chain_checks ?? session.chain_checks };
   });
 
   app.get("/v1/mining/status", async (req) => {
@@ -290,7 +355,15 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       tier: user.tier,
       streakDays: streak.streak_days,
       graceDays: streak.grace_banked,
-      session: last ? { startedAt: last.started_at, endsAt: last.started_at + 86_400n, creditedDay: last.credited_day } : null,
+      session: last
+        ? {
+            startedAt: last.started_at,
+            endsAt: last.started_at + 86_400n,
+            creditedDay: last.credited_day,
+            chainChecks: last.chain_checks,
+            lastCheckedOutput: last.last_checked_output === null ? null : BigInt(last.last_checked_output),
+          }
+        : null,
       canStart: state.ok,
       nextAllowedAt: state.ok ? null : state.nextAllowedAt,
       estimatedPerHour: perDay / 24n,

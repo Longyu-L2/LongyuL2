@@ -16,12 +16,13 @@ import { Brand, Button, Callout, Card, Col, Columns, ErrorText, Figure, Header, 
 import { Pearl, type PearlState } from "@/components/Pearl";
 import { PulseCheck } from "@/components/PulseCheck";
 import { LiveAmount, LiveFigure, RewardBar, RewardLine } from "@/components/Rewards";
+import { checkChain, solvePuzzle, type RootParts } from "@/lib/chain-work";
 
 interface Status {
   day: string;
   tier: number;
   streakDays: number;
-  session: { startedAt: string; endsAt: string } | null;
+  session: { startedAt: string; endsAt: string; chainChecks?: number; lastCheckedOutput?: string | null } | null;
   canStart: boolean;
   nextAllowedAt: string | null;
   estimatedPerHour: string;
@@ -36,6 +37,14 @@ interface Capacity {
   plans: { id: string; boostBps: number }[];
   current: { boost_bps: number; start_day: string; end_day: string } | null;
 }
+
+/** The work the API asks for at the start of a session. */
+interface Work {
+  bits: number;
+  output: { index: string; l2Block: string } | null;
+}
+/** While a session runs, the newest state root on BSC is checked this often, when the screen is open. */
+const CHECK_EVERY = 15 * 60_000;
 
 // In a wide window: the inside of a panel, and a panel that fills its column.
 const panelBody = { padding: space.xl, gap: space.lg } as const;
@@ -58,7 +67,11 @@ export default function MineScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [pulse, setPulse] = useState(false);
-  const pending = useRef<{ challengeId: string; nonce: string } | null>(null);
+  const pending = useRef<{ challengeId: string; nonce: string; work?: { counter?: string; parts?: RootParts } } | null>(null);
+  const [working, setWorking] = useState(false);
+  // The newest state root this phone rebuilt, and whether it matched the one on BSC.
+  const [lastCheck, setLastCheck] = useState<{ index: bigint; match: boolean } | null>(null);
+  const checkedAt = useRef(0);
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(() => Promise.all([refresh("/v1/mining/status"), refresh("/v1/boosts")]), []);
@@ -88,7 +101,7 @@ export default function MineScreen() {
     if (!ch) return;
     try {
       const attestationToken = await proveSession(ch.nonce);
-      await api("POST", "/v1/mining/start", { challengeId: ch.challengeId, attestationToken, captchaToken });
+      await api("POST", "/v1/mining/start", { challengeId: ch.challengeId, attestationToken, captchaToken, work: ch.work });
       pending.current = null;
       success();
       await refresh("/v1/mining/status");
@@ -100,11 +113,27 @@ export default function MineScreen() {
     }
   };
 
+  // The puzzle on the challenge's nonce, and the state root the API picked, rebuilt here.
+  const doWork = async (nonce: string, work: Work) => {
+    setWorking(true);
+    try {
+      const counter = work.bits > 0 ? await solvePuzzle(nonce, work.bits) : undefined;
+      const check = work.output ? await checkChain(BigInt(work.output.index)).catch(() => null) : null;
+      if (check) {
+        setLastCheck({ index: check.index, match: check.match });
+        checkedAt.current = Date.now();
+      }
+      return { counter, parts: check?.parts };
+    } finally {
+      setWorking(false);
+    }
+  };
+
   const begin = async (retried = false): Promise<void> => {
     setBusy(true);
     setError("");
     try {
-      let ch: { challengeId: string; nonce: string; pulseRequired: boolean };
+      let ch: { challengeId: string; nonce: string; pulseRequired: boolean; work?: Work };
       try {
         ch = await api("POST", "/v1/mining/challenge");
       } catch (e) {
@@ -115,7 +144,7 @@ export default function MineScreen() {
         }
         throw e;
       }
-      pending.current = ch;
+      pending.current = { challengeId: ch.challengeId, nonce: ch.nonce, work: ch.work ? await doWork(ch.nonce, ch.work) : undefined };
       if (ch.pulseRequired) setPulse(true);
       else await start();
     } catch (e) {
@@ -127,6 +156,25 @@ export default function MineScreen() {
 
   const session = status?.session;
   const mining = Boolean(session && now < Number(session.endsAt));
+  // While a session runs and the screen is open, the newest state root on BSC is rebuilt and reported.
+  useEffect(() => {
+    if (!mining) return;
+    const run = async () => {
+      if (Date.now() - checkedAt.current < CHECK_EVERY) return;
+      checkedAt.current = Date.now();
+      try {
+        const check = await checkChain();
+        setLastCheck({ index: check.index, match: check.match });
+        await api("POST", "/v1/mining/check", { index: String(check.index), parts: check.parts });
+        void refresh("/v1/mining/status");
+      } catch {
+        // A missed check is tried again at the next turn.
+      }
+    };
+    void run();
+    const id = setInterval(() => void run(), 60_000);
+    return () => clearInterval(id);
+  }, [mining]);
   // The server says when a session may start, which is before the running one ends.
   const state: PearlState = status?.canStart ? "ready" : mining ? "mining" : "resting";
   const progress = session && mining ? sessionProgress(Number(session.startedAt), now) : 0;
@@ -154,13 +202,23 @@ export default function MineScreen() {
     </>
   );
 
+  // How many state roots this session has checked, and the newest one's outcome.
+  const checks = mining ? session?.chainChecks ?? 0 : 0;
+  const newest = lastCheck ?? (mining && session?.lastCheckedOutput ? { index: BigInt(session.lastCheckedOutput), match: true } : null);
+  const chainLine = mining && (checks > 0 || newest) ? (
+    <T variant="label" color={newest && !newest.match ? colors.danger : colors.textSoft} center={!wide} style={tabular}>
+      {[`${t("chainChecks")} ${checks}`, newest ? fill(t(newest.match ? "chainMatches" : "chainMismatch"), { n: `#${newest.index}` }) : ""].filter(Boolean).join(" · ")}
+    </T>
+  ) : null;
+
   const hero = (
     <View style={{ alignItems: "center", gap: space.xl }}>
       <Pearl state={state} progress={progress} size={dial} onPress={canTap ? () => void begin() : undefined} label={t(state === "ready" ? "startMining" : state)} />
       <View style={{ alignItems: "center", gap: 4, minHeight: 68, justifyContent: "center" }}>{readout}</View>
+      {chainLine}
       {state === "ready" ? (
         <View style={{ alignSelf: "stretch" }}>
-          <Button title={t("startMining")} onPress={() => void begin()} busy={busy} disabled={!canTap} />
+          <Button title={working ? t("checkingChain") : t("startMining")} onPress={() => void begin()} busy={busy} disabled={!canTap} />
         </View>
       ) : null}
       {shown ? <View style={{ alignSelf: "stretch" }}><ErrorText>{shown}</ErrorText></View> : null}
@@ -262,9 +320,10 @@ export default function MineScreen() {
             <Pearl state={state} progress={progress} size={dial} onPress={canTap ? () => void begin() : undefined} label={t(state === "ready" ? "startMining" : state)} />
             <View style={{ flex: 1, minWidth: 0, gap: space.xl }}>
               <View style={{ gap: 4 }}>{readout}</View>
+              {chainLine}
               {state === "ready" ? (
                 <View style={{ alignSelf: "flex-start", minWidth: 220 }}>
-                  <Button title={t("startMining")} onPress={() => void begin()} busy={busy} disabled={!canTap} />
+                  <Button title={working ? t("checkingChain") : t("startMining")} onPress={() => void begin()} busy={busy} disabled={!canTap} />
                 </View>
               ) : null}
               {shown ? <ErrorText>{shown}</ErrorText> : null}

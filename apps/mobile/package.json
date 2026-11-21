@@ -43,7 +43,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/lib/format.test.ts src/lib/i18n.test.ts src/lib/errors.test.ts src/lib/wallet-key.test.ts src/lib/app-config.test.ts src/lib/x-auth.test.ts src/lib/rewards.test.ts src/lib/cache.test.ts src/lib/request.test.ts src/lib/core.web.test.ts src/lib/server-clock.test.ts src/lib/answers.test.ts src/lib/invite.test.ts site/server.test.ts"
+    "test": "node --import tsx --test src/lib/format.test.ts src/lib/i18n.test.ts src/lib/errors.test.ts src/lib/wallet-key.test.ts src/lib/app-config.test.ts src/lib/x-auth.test.ts src/lib/rewards.test.ts src/lib/cache.test.ts src/lib/request.test.ts src/lib/core.web.test.ts src/lib/server-clock.test.ts src/lib/answers.test.ts src/lib/invite.test.ts src/lib/chain-work.test.ts site/server.test.ts"
   },
   "private": true
 }

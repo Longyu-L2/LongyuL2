@@ -21,6 +21,8 @@ ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /app/dist dist
 COPY apps/mobile/site/server.mjs server.mjs
+# The chain check's RPC addresses, which the page may call; server.mjs reads it as ../chain-check.json.
+COPY apps/mobile/chain-check.json /chain-check.json
 COPY apps/mobile/site/downloads downloads
 RUN useradd --system --uid 10001 longyu
 USER longyu

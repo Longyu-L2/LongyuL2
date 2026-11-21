@@ -33,10 +33,24 @@ const APK_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}\.apk$/;
 const APK_TYPE = "application/vnd.android.package-archive";
 
 /**
- * What the page may load and call: its own files, the API, and Cloudflare's human check. The app
+ * What the page may load and call: its own files, the API, the two RPC addresses of the chain check,
+ * and Cloudflare's human check. The app
  * styles itself from script (React Native for Web), which is why inline styles are allowed.
  */
-export function contentPolicy(apiUrl) {
+/**
+ * The two addresses the app's chain check reads (src/lib/chain-work.ts): LONGYU's RPC and a BSC RPC.
+ * The defaults are in chain-check.json, next to app.config.ts in the repository and at / in the image.
+ */
+export function chainCheckOrigins(env = process.env) {
+  const defaults = JSON.parse(readFileSync(new URL("../chain-check.json", import.meta.url), "utf8"));
+  return [env.EXPO_PUBLIC_L2_RPC_URL || defaults.l2RpcUrl, env.EXPO_PUBLIC_L1_RPC_URL || defaults.l1RpcUrl].map((raw) => {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") throw new Error("the chain check's RPC addresses must be https");
+    return url.origin;
+  });
+}
+
+export function contentPolicy(apiUrl, checkOrigins = chainCheckOrigins()) {
   let api;
   try {
     api = new URL(apiUrl ?? "");
@@ -52,7 +66,7 @@ export function contentPolicy(apiUrl) {
     // pbs.twimg.com: the profile picture of the X account a person signed in with.
     "img-src 'self' data: blob: https://pbs.twimg.com",
     "font-src 'self' data:",
-    `connect-src 'self' ${api.origin}`,
+    `connect-src 'self' ${[api.origin, ...checkOrigins].join(" ")}`,
     "frame-src https://challenges.cloudflare.com",
     "frame-ancestors 'none'",
     "base-uri 'none'",

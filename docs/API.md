@@ -37,8 +37,9 @@ The account is tied to the X account's numeric id; the username and the profile 
 
 | Method and path | Auth | Body | Result |
 |---|---|---|---|
-| `POST /v1/mining/challenge` | user | – | `challengeId, nonce, pulseRequired`. The human check is decided once per user per day, and is always required in a browser; a new challenge cancels the previous one |
-| `POST /v1/mining/start` | user | `challengeId, attestationToken, captchaToken?` | `startedAt, endsAt, creditedDay`. A phone must send `attestationToken` (`attestation_required`, 400); a browser sends `captchaToken` and no attestation |
+| `POST /v1/mining/challenge` | user | – | `challengeId, nonce, pulseRequired, work`. The human check is decided once per user per day, and is always required in a browser; a new challenge cancels the previous one. `work.bits` is the puzzle's size; `work.output` (`index, l2Block`, or null when BSC cannot be read) is the state root to rebuild |
+| `POST /v1/mining/start` | user | `challengeId, attestationToken, captchaToken?, work?` | `startedAt, endsAt, creditedDay`. A phone must send `attestationToken` (`attestation_required`, 400); a browser sends `captchaToken` and no attestation. `work`: `counter` (the puzzle's answer) and `parts` (`stateRoot, messagePasserRoot, blockHash` of the state root's block). Required of the devices in `PHONE_WORK_PLATFORMS` (`work_required`, 403); a wrong answer is refused (`work_invalid`, `chain_check_failed`, 403) |
+| `POST /v1/mining/check` | user | `index, parts` | `match, counted, checks`. A state root rebuilt during a running session (`no_active_session`, 409); one of the last eight posted (`output_too_old`, `output_unknown`, 400). Each newer root counts once; parts that differ from what the API's own node rebuilds are refused (`chain_check_failed`, 403) |
 | `GET /v1/mining/status` | user | – | Session, streak, tier, estimated rate, `balances` (null until the account has a wallet), `invites` (`active`: invited accounts counted today; `bps`: what they add to the rate; `bpsEach` and `capBps`: the rule, with `bpsEach` 0 while the invite bonus is off) |
 | `GET /v1/rewards` | user | – | The balances, `activeRootDay` and recent claims |
 | `POST /v1/rewards/claim` | user | – | Queues a gasless claim |

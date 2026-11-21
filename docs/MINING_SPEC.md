@@ -6,7 +6,12 @@ This is the rule set the contracts and the reward engine implement. Where any ot
 
 - A session lasts 24 hours. A new session may start 20 hours after the previous start.
 - A session counts for the UTC day in which it **starts**, at most one per day. The 4-hour early-renewal window stops start times drifting past midnight and costing a day.
-- The phone does no work. "Mining" is a participation reward.
+- Starting a session takes work from the phone:
+  - a puzzle: a counter for which sha256("<challenge nonce>:<counter>") starts with 15 zero bits, a few seconds of computing;
+  - a chain check: the phone reads a state root posted on BSC (picked by the API from the latest four) directly from BSC, rebuilds it from LONGYU's own data, and sends the parts. A state root is keccak256 of version 0, the block's state root, the storage root of the message passer at `0x4200…0016` and the block hash.
+- While a session runs and the app is open, the phone rebuilds the newest state root every 15 minutes and reports it. Each newer root counts once for the session.
+- The work does not change what a session earns: rewards follow the rules below. It makes starting sessions in bulk cost computing time, and every miner checks that the chain they are served is the one committed on BSC. A root that a phone and the API's own node both fail to rebuild is reported to operations as a disagreement between the chain and BSC.
+- Browsers must do the work now. Phones must from version 1.0.4 of the Android app; earlier versions start without it.
 
 ## Daily reward
 

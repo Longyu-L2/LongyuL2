@@ -14,7 +14,7 @@ import { useRoomy, useWide } from "@/design/layout";
 import { success } from "@/design/haptics";
 import { Button, Card, Col, Columns, Empty, ErrorText, Header, List, Notice, Panel, Row, Screen, Section, Skeleton, T } from "@/components/ui";
 import { Icon } from "@/components/Icon";
-import { LiveAmount, LiveFigure, RewardBar, RewardLine, UnlockNote, partColor } from "@/components/Rewards";
+import { LiveAmount, LiveFigure, RewardBar, RewardLine, TgeLock, UnlockNote, partColor } from "@/components/Rewards";
 
 interface Rewards {
   address: string;
@@ -106,6 +106,7 @@ export default function WalletScreen() {
           <View style={{ gap: 2 }}>
             <T variant="label" color={colors.textSoft}>{t("mined")}</T>
             <LiveFigure part="earned" unit={symbol} size="figure" />
+            <TgeLock />
           </View>
           <RewardBar />
         </View>
@@ -230,6 +231,7 @@ export default function WalletScreen() {
             <View style={{ gap: 2 }}>
               <T variant="label" color={colors.textSoft}>{t("mined")}</T>
               <LiveFigure part="earned" unit={symbol} />
+              <TgeLock />
             </View>
             <View style={{ gap: space.md }}>
               <RewardBar />

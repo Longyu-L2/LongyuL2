@@ -1,9 +1,10 @@
 import { after, test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readdirSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
+import { fileURLToPath } from "node:url";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 // @ts-expect-error a plain JavaScript module without type declarations
 import { chainCheckOrigins, contentPolicy, createHandler, lightOnly, loadSite, parseRange, ROUTES } from "./server.mjs";
@@ -252,6 +253,22 @@ test("behind Cloudflare, only requests carrying its secret header are served", a
 
 test("the chain check's two RPC addresses: the defaults, a build's own, and never plain http", () => {
   assert.deepEqual(chainCheckOrigins({}), ["https://rpc-testnet.longyu.network", "https://bsc-testnet-rpc.publicnode.com"]);
+  assert.deepEqual(chainCheckOrigins({ APP_VARIANT: "testnet" }), ["https://rpc-testnet.longyu.network", "https://bsc-testnet-rpc.publicnode.com"]);
+  assert.deepEqual(chainCheckOrigins({ APP_VARIANT: "development" }), ["https://rpc-testnet.longyu.network", "https://bsc-testnet-rpc.publicnode.com"]);
+  assert.deepEqual(chainCheckOrigins({ APP_VARIANT: "production" }), ["https://rpc.longyu.network", "https://bsc-rpc.publicnode.com"]);
+  // The image's own file wins over APP_VARIANT.
+  const mainnetFile = fileURLToPath(new URL("../chain-check.production.json", import.meta.url));
+  assert.deepEqual(chainCheckOrigins({ APP_VARIANT: "testnet", LONGYU_CHAIN_CHECK: mainnetFile }), ["https://rpc.longyu.network", "https://bsc-rpc.publicnode.com"]);
   assert.deepEqual(chainCheckOrigins({ EXPO_PUBLIC_L2_RPC_URL: "https://rpc.example.org/x", EXPO_PUBLIC_L1_RPC_URL: "https://bsc.example.org" }), ["https://rpc.example.org", "https://bsc.example.org"]);
   assert.throws(() => chainCheckOrigins({ EXPO_PUBLIC_L1_RPC_URL: "http://bsc.example.org" }), /https/);
+});
+
+test("the image: testnet unless APP_VARIANT says production, holding only that network's chain check", () => {
+  const dockerfile = readFileSync(fileURLToPath(new URL("./Dockerfile", import.meta.url)), "utf8");
+  assert.match(dockerfile, /^ARG APP_VARIANT=testnet$/m);
+  assert.match(dockerfile, /testnet \| production\) ;;/);
+  assert.match(dockerfile, /cp "chain-check\.\$APP_VARIANT\.json" \/chain-check\.json/);
+  assert.match(dockerfile, /^COPY --from=build \/chain-check\.json \/chain-check\.json$/m);
+  assert.match(dockerfile, /^ENV LONGYU_CHAIN_CHECK=\/chain-check\.json$/m);
+  assert.doesNotMatch(dockerfile, /^COPY apps\/mobile\/chain-check/m);
 });

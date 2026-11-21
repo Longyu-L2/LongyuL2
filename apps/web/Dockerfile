@@ -14,6 +14,8 @@ RUN npm ci --include=dev --workspace @longyu/web --include-workspace-root=false
 COPY packages/abis packages/abis
 COPY apps/web apps/web
 # The pages' settings are fixed into the files at build time (see apps/web/build.mjs). All are public values.
+# NETWORK is testnet (the default) or mainnet.
+ARG NETWORK
 ARG API_URL
 ARG CHAIN_ID
 ARG CHAIN_NAME
@@ -21,6 +23,8 @@ ARG NATIVE_SYMBOL
 ARG RPC_URL
 ARG EXPLORER_URL
 ARG REWARD_TOKEN
+ARG TOKEN_NAME
+ARG TOKEN_SYMBOL
 ARG DISTRIBUTOR
 ARG L1_PORTAL
 ARG L1_OUTPUT_ORACLE

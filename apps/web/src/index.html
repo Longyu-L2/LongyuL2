@@ -34,7 +34,7 @@
   <body>
     <main>
       <h1><img class="seal" src="./mark.svg" alt="" width="23" height="28" />Claim rewards</h1>
-      <p class="muted">Claim <span id="symbol">tLONG</span> straight from the distributor contract. Gas is paid in BNB.</p>
+      <p class="muted">Claim <span id="symbol">{{TOKEN}}</span> straight from the distributor contract. Gas is paid in BNB.</p>
       <section class="card">
         <div class="row"><span class="muted">Network</span><span id="network">–</span></div>
         <div class="row"><span class="muted">Verified miners</span><span id="miners">–</span></div>
@@ -45,15 +45,16 @@
         <div class="row"><span class="muted">Address</span><code id="address">–</code></div>
         <div class="row"><span class="muted">Ready to claim</span><span class="big" id="owed">–</span></div>
         <button id="claim" disabled>Claim</button>
-        <button id="watch" class="secondary" hidden>Show tLONG in my wallet</button>
+        <button id="watch" class="secondary" hidden>Show {{TOKEN}} in my wallet</button>
         <div class="muted" id="status"></div>
         <div id="error"></div>
       </section>
       <section class="card" id="mine" hidden>
-        <div><strong>Earn tLONG</strong><div class="muted">LONGYU MINE runs in the browser of any phone or computer. Android also has an app.</div></div>
+        <div><strong>Earn {{TOKEN}}</strong><div class="muted">LONGYU MINE runs in the browser of any phone or computer. Android also has an app.</div></div>
         <div class="links"><a class="box" id="mine-web" rel="noopener">Open LONGYU MINE</a><a id="mine-android" rel="noopener">Get the Android app</a></div>
       </section>
-      <p class="muted faint">Testnet rewards have no monetary value.</p>
+      <p class="muted faint" data-network="testnet">Testnet rewards have no monetary value.</p>
+      <p class="muted faint" data-network="mainnet">Mined {{TOKEN}} is locked in your wallet until the TGE.</p>
     </main>
     <script type="module" src="./main.js"></script>
   </body>

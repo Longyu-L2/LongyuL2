@@ -5,9 +5,10 @@
  * call payNative. The page then waits for the API to see the payment as final.
  */
 import { createPublicClient, createWalletClient, custom, erc20Abi, type Address, type EIP1193Provider, type Hex } from "viem";
-import { bsc, bscTestnet } from "viem/chains";
+import { bsc } from "viem/chains";
 import { paymentRouterAbi } from "@longyu/abis";
 import { explorerTxUrl, parseOrderId, type OrderView } from "./pay-core.ts";
+import { L1_CHAIN } from "./profile.ts";
 
 declare const __API_URL__: string;
 declare global {
@@ -47,7 +48,8 @@ async function pay(o: OrderView): Promise<void> {
   const p = o.pay!;
   const eth = window.ethereum;
   if (!eth) throw new Error("No wallet found. Open this page in your wallet's browser (MetaMask, Trust Wallet or Binance Wallet).");
-  const chain = Number(p.chainId) === 56 ? bsc : Number(p.chainId) === 97 ? bscTestnet : null;
+  // BNB Smart Chain, or the build's own BNB Smart Chain (its testnet on a testnet build).
+  const chain = Number(p.chainId) === bsc.id ? bsc : Number(p.chainId) === L1_CHAIN.id ? L1_CHAIN : null;
   if (!chain) throw new Error(`Unsupported payment chain ${p.chainId}.`);
   const [account] = (await eth.request({ method: "eth_requestAccounts" })) as Address[];
   if (!account) throw new Error("No account selected in the wallet.");

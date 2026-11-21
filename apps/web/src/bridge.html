@@ -65,7 +65,7 @@
     <main>
       <header>
         <h1><img class="seal" src="./mark.svg" alt="" width="23" height="28" />Bridge</h1>
-        <nav aria-label="Pages"><a href="./bridge.html" aria-current="page">Bridge</a><a href="./swap.html">Swap</a></nav>
+        <nav aria-label="Pages" data-network="testnet"><a href="./bridge.html" aria-current="page">Bridge</a><a href="./swap.html">Swap</a></nav>
       </header>
       <section class="card" id="bridge">
         <div class="muted" id="closed" hidden></div>
@@ -74,10 +74,11 @@
           <button type="button" id="dir-withdraw" aria-pressed="false">Withdraw</button>
         </div>
         <div class="seg" role="group" aria-label="Asset">
-          <button type="button" id="asset-bnb" aria-pressed="true">tBNB</button>
-          <button type="button" id="asset-long" aria-pressed="false">tLONG</button>
+          <button type="button" id="asset-bnb" aria-pressed="true">{{NATIVE}}</button>
+          <button type="button" id="asset-long" aria-pressed="false" data-network="testnet">{{TOKEN}}</button>
+          <button type="button" id="asset-long" aria-pressed="false" data-network="mainnet" disabled>{{TOKEN}}</button>
         </div>
-        <div class="row"><span class="muted">Route</span><span id="route">BSC Testnet → LONGYU</span></div>
+        <div class="row"><span class="muted">Route</span><span id="route">{{L1_NAME}} → LONGYU</span></div>
         <input id="amount" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0.0" aria-label="Amount" maxlength="80" />
         <div class="quick" role="group" aria-label="Share of balance" id="quick" hidden>
           <button type="button" data-share="25">25%</button>
@@ -105,7 +106,8 @@
         <div id="list"></div>
         <div class="faint" id="empty">None yet</div>
       </section>
-      <p class="muted faint">Testnet tokens have no monetary value.</p>
+      <p class="muted faint" data-network="testnet">Testnet tokens have no monetary value.</p>
+      <p class="muted faint" data-network="mainnet">{{TOKEN}} moves after the TGE.</p>
     </main>
     <script type="module" src="./bridge.js"></script>
   </body>

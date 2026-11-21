@@ -30,7 +30,7 @@ export interface Network {
   chainId: string;
   chainName: string;
   explorerUrl: string;
-  /** BNB on LONGYU (tBNB on testnet): what gas is paid in. */
+  /** BNB on LONGYU: what gas is paid in. */
   nativeCurrency: { name: string; symbol: string; decimals: number };
   /** The token mining pays: null when rewards are native, absent while the API cannot read the chain. */
   rewardToken?: { address: string; name: string; symbol: string; decimals: number } | null;
@@ -159,8 +159,8 @@ export function useApp(): AppState {
   return v;
 }
 
-/** Symbol of the mining reward token: tLONG on testnet, LONG on mainnet. */
+/** Symbol of the mining reward token, as the API gives it; until then, the build's network's. */
 export function useSymbol(): string {
   const n = useApp().network;
-  return n?.rewardToken === null ? n.nativeCurrency.symbol : n?.rewardToken?.symbol ?? "tLONG";
+  return n?.rewardToken === null ? n.nativeCurrency.symbol : n?.rewardToken?.symbol ?? (process.env.EXPO_PUBLIC_APP_VARIANT === "production" ? "LONG" : "tLONG");
 }

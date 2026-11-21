@@ -5,12 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src https: http://localhost:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'" />
     <title>LONGYU Network: the Layer 2 you can mine</title>
-    <meta name="description" content="LONGYU is a Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine tLONG on testnet from any phone or computer." />
+    <meta name="description" content="LONGYU is a Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine tLONG on testnet from any phone or computer." data-network="testnet" />
+    <meta name="description" content="LONGYU is a Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine {{TOKEN}} from any phone or computer." data-network="mainnet" />
     <link rel="canonical" href="{{SITE_URL}}/" />
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="LONGYU Network" />
     <meta property="og:title" content="LONGYU Network: the Layer 2 you can mine" />
-    <meta property="og:description" content="A Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine tLONG on testnet from any phone or computer." />
+    <meta property="og:description" content="A Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine tLONG on testnet from any phone or computer." data-network="testnet" />
+    <meta property="og:description" content="A Layer 2 on BNB Chain with 250 ms blocks and BNB for gas. Mine {{TOKEN}} from any phone or computer." data-network="mainnet" />
     <meta property="og:url" content="{{SITE_URL}}/" />
     <meta property="og:image" content="{{SITE_URL}}/share.png" />
     <meta property="og:image:width" content="1200" />
@@ -211,7 +213,7 @@
         <nav id="menu" aria-label="Main">
           <a href="{{MINE_URL}}/">Mine</a>
           <a href="{{APP_URL}}/bridge.html">Bridge</a>
-          <a href="{{APP_URL}}/swap.html">Swap</a>
+          <a href="{{APP_URL}}/swap.html" data-network="testnet">Swap</a>
           <a href="{{APP_URL}}/">Claim</a>
           <a href="{{EXPLORER_URL}}/">Explorer</a>
           <a href="./developers">Developers</a>
@@ -258,20 +260,23 @@
 
       <section class="apps">
         <div class="wrap">
-          <h2>Live on testnet</h2>
+          <h2 data-network="testnet">Live on testnet</h2>
+          <h2 data-network="mainnet">Live on mainnet</h2>
           <div class="grid">
             <div class="mine">
               <svg viewBox="0 0 360 360" aria-hidden="true"><circle cx="180" cy="180" r="179" stroke-opacity="0.18" /><circle cx="180" cy="180" r="130" stroke-opacity="0.26" /><circle cx="180" cy="180" r="82" stroke-opacity="0.36" /></svg>
               <h3>LONGYU MINE</h3>
-              <p>Mine tLONG from any phone or computer. One session lasts 24 hours.</p>
+              <p>Mine {{TOKEN}} from any phone or computer. One session lasts 24 hours.</p>
               <div class="actions">
                 <a class="button white" href="{{MINE_URL}}/">Open the miner</a>
                 <a class="link" href="{{MINE_URL}}/download/android">Android app</a>
               </div>
             </div>
             <div class="cards">
-              <a class="card" href="{{APP_URL}}/bridge.html"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB and tLONG between BSC and LONGYU.</p></a>
-              <a class="card" href="{{APP_URL}}/swap.html"><h3>Swap<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Trade and provide liquidity on LONGYU Swap.</p></a>
+              <a class="card" href="{{APP_URL}}/bridge.html" data-network="testnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB and {{TOKEN}} between BSC and LONGYU.</p></a>
+              <a class="card" href="{{APP_URL}}/bridge.html" data-network="mainnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB between BSC and LONGYU.</p></a>
+              <a class="card" href="{{APP_URL}}/swap.html" data-network="testnet"><h3>Swap<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Trade and provide liquidity on LONGYU Swap.</p></a>
+              <a class="card" href="./developers" data-network="mainnet"><h3>Developers<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Network details, deploy and verify.</p></a>
               <a class="card" href="{{APP_URL}}/"><h3>Claim<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Claim mined rewards straight from the contract.</p></a>
               <a class="card" href="{{EXPLORER_URL}}/"><h3>LONGYU Scan<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Blocks, transactions, tokens and contracts.</p></a>
             </div>
@@ -318,7 +323,8 @@
           <p lang="zh-Hans">龙宇网络</p>
         </div>
         <div class="cols">
-          <div><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/swap.html">Swap</a><a href="{{APP_URL}}/">Claim</a></div>
+          <div data-network="testnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/swap.html">Swap</a><a href="{{APP_URL}}/">Claim</a></div>
+          <div data-network="mainnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/">Claim</a></div>
           <div>
             <h3>Developers</h3>
             <a href="{{EXPLORER_URL}}/">Explorer</a>
@@ -327,7 +333,8 @@
             <a href="{{X_URL}}" rel="noopener" data-optional="X_URL">X</a>
           </div>
         </div>
-        <p class="fine">Testnet. tLONG on testnet has no monetary value.</p>
+        <p class="fine" data-network="testnet">Testnet. tLONG on testnet has no monetary value.</p>
+        <p class="fine" data-network="mainnet">Mined {{TOKEN}} is locked in wallets until the TGE.</p>
       </div>
     </footer>
     <script type="module" src="./landing.js"></script>

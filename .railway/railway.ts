@@ -329,6 +329,8 @@ export default defineRailway(() => {
     deploy: { restartPolicyType: "ON_FAILURE", restartPolicyMaxRetries: 10 },
     env: {
       PORT: "8080",
+      // The network the pages are built for (apps/web/src/networks.json): this project is the testnet.
+      NETWORK: "testnet",
       PAGES: "claim,bridge,swap,safe",
       LANDING_HOSTS: "longyu.network",
       REDIRECT_HOSTS: "www.longyu.network",

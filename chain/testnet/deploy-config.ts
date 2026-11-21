@@ -191,11 +191,19 @@ export function onWholeSecond(block: { mixHash: string }): boolean {
  */
 async function startingBlock(rpc: string, tag = "finalized") {
   type Block = { hash: string; parentHash: string; timestamp: string; mixHash: string };
+  // Public endpoints drop a request now and then; each read is tried up to five times.
   const call = async (method: string, params: unknown[]) => {
-    const res = await fetch(rpc, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-    const body = (await res.json()) as { result?: unknown; error?: { message: string } };
-    if (body.error || body.result === undefined || body.result === null) throw new Error(`${method}: ${body.error?.message ?? "no result"}`);
-    return body.result;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const res = await fetch(rpc, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+        const body = (await res.json()) as { result?: unknown; error?: { message: string } };
+        if (body.error || body.result === undefined || body.result === null) throw new Error(`${method}: ${body.error?.message ?? "no result"}`);
+        return body.result;
+      } catch (e) {
+        if (attempt === 5) throw e;
+        await new Promise((r) => setTimeout(r, 1000 * attempt));
+      }
+    }
   };
   const chainId = Number(await call("eth_chainId", []));
   let block = (await call("eth_getBlockByNumber", [tag, false])) as Block;

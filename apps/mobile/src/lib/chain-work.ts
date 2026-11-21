@@ -6,7 +6,20 @@
  *   passer at 0x4200…0016, the block hash). BSC is read directly, not through the LONGYU API.
  */
 import { concat, decodeFunctionResult, encodeFunctionData, keccak256, numberToHex, parseAbi, sha256, stringToBytes, type Hex } from "viem";
-import defaults from "../../chain-check.json";
+
+interface ChainCheckDefaults {
+  l2RpcUrl: string;
+  l1RpcUrl: string;
+  outputOracle: string;
+}
+
+/**
+ * The addresses of the build's network: chain-check.production.json for the mainnet app, the testnet's
+ * for the others. The comparison is written out here, not imported (see variant.ts), so a release bundle
+ * holds one of the two files.
+ */
+const defaults: ChainCheckDefaults =
+  process.env.EXPO_PUBLIC_APP_VARIANT === "production" ? require("../../chain-check.production.json") : require("../../chain-check.testnet.json");
 
 export const chainCheck = {
   l2RpcUrl: process.env.EXPO_PUBLIC_L2_RPC_URL || defaults.l2RpcUrl,

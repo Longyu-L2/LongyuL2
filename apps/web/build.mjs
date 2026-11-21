@@ -1,16 +1,26 @@
 // Bundles the claim page (src/main.ts), the pay page (src/pay.ts), the bridge page (src/bridge.ts), the swap
 // page (src/swap.ts) and the Safe page (src/safe.ts) into dist/ with the API URL baked in. Usage: API_URL=https://api.example node build.mjs
+// (node build.mjs --out <folder> writes somewhere other than dist/).
+//
+// NETWORK picks the network the pages are for: testnet (the default) or mainnet. Its profile in
+// src/networks.json (BSC's chain, LONGYU's chain id and name, the symbols, what is open) is fixed
+// into every page and script, and the other network's values appear nowhere in the build. On mainnet,
+// which opens as a mining period, LONG is locked in wallets until the TGE: the bridge moves BNB only
+// (L1_TOKEN and L2_TOKEN are not read), the swap page is not built and no page links to it, and the
+// Safe page does not list the faucet's calls. CHAIN_ID, when set, must be the profile's LONGYU chain id.
+//   NETWORK             testnet or mainnet (default testnet)
+//   TOKEN_NAME, TOKEN_SYMBOL  the reward token on the claim page (default the profile's: tLONG, or LONG)
 //
 // The bridge page's settings are read only from these variables. Its addresses are never guessed: when one is
 // missing or invalid, the page says it is unavailable and no action works.
-// Use the proxy addresses from chain/testnet/l1-deployments.json, not the implementations.
-//   L1_PORTAL           OptimismPortalProxy on BSC testnet
-//   L1_OUTPUT_ORACLE    L2OutputOracleProxy on BSC testnet
-//   L1_STANDARD_BRIDGE  L1StandardBridgeProxy on BSC testnet
-//   L1_TOKEN            tLONG, the BEP-20 on BSC testnet
-//   L2_TOKEN            tLONG on LONGYU (the OptimismMintableERC20 created by the factory predeploy)
-//   L2_RPC_URL          LONGYU testnet RPC, https
-//   L1_RPC_URL          BSC testnet RPC, https (default https://bsc-testnet-rpc.publicnode.com)
+// Use the proxy addresses from the network's l1-deployments.json (chain/testnet/), not the implementations.
+//   L1_PORTAL           OptimismPortalProxy on BSC
+//   L1_OUTPUT_ORACLE    L2OutputOracleProxy on BSC
+//   L1_STANDARD_BRIDGE  L1StandardBridgeProxy on BSC
+//   L1_TOKEN            the mined token, the BEP-20 on BSC (testnet only)
+//   L2_TOKEN            the mined token on LONGYU (the OptimismMintableERC20 created by the factory predeploy)
+//   L2_RPC_URL          LONGYU RPC, https
+//   L1_RPC_URL          BSC RPC, https (default the profile's public node, l1.rpc in src/networks.json)
 //   EXPLORER_URL        LONGYU explorer, for transaction links (optional; also used by the claim page)
 //
 // The claim page links to LONGYU MINE when it is given its address; without it, no link shows.
@@ -41,10 +51,23 @@ import { build } from "esbuild";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-const PAGES = ["index.html", "pay.html", "bridge.html", "swap.html", "safe.html"];
+/** The networks a build can be for, read by the pages through src/profile.ts. */
+export const PROFILES = JSON.parse(readFileSync(new URL("./src/networks.json", import.meta.url), "utf8"));
+
+/** The profile NETWORK names: testnet when it is empty. */
+export function profileFor(network) {
+  const name = (network ?? "").trim() || "testnet";
+  if (!Object.hasOwn(PROFILES, name)) throw new Error(`NETWORK must be testnet or mainnet, not "${name}"`);
+  return PROFILES[name];
+}
+
+/** The pages a network's build makes: the swap page only where it is open. */
+export function pagesFor(profile) {
+  return ["index.html", "pay.html", "bridge.html", ...(profile.swap ? ["swap.html"] : []), "safe.html"];
+}
 
 /** The BSC testnet node the bridge and Safe pages read when L1_RPC_URL is empty: DEFAULT_L1_RPC in src/bridge-core.ts. */
-export const DEFAULT_L1_RPC = "https://bsc-testnet-rpc.publicnode.com";
+export const DEFAULT_L1_RPC = PROFILES.testnet.l1.rpc;
 
 // The settings that hold the addresses each page's script sends requests to. A wallet is reached inside
 // the browser and is not one of them. The claim page (index.html) is not listed: it reads the chain at
@@ -84,11 +107,11 @@ export function connectSource(name, value) {
 }
 
 /** A page's connect-src sources from the build's settings, or null for a page whose policy is not narrowed. */
-export function connectSources(page, settings) {
+export function connectSources(page, settings, profile = PROFILES.testnet) {
   if (!Object.hasOwn(CONTACTS, page)) return null;
   const sources = new Set();
   for (const name of CONTACTS[page]) {
-    const value = (settings[name] ?? "").trim() || (name === "L1_RPC_URL" ? DEFAULT_L1_RPC : "");
+    const value = (settings[name] ?? "").trim() || (name === "L1_RPC_URL" ? profile.l1.rpc : "");
     if (value) sources.add(connectSource(name, value));
     // With an empty API_URL the page asks the address it was served from.
     else if (name === "API_URL") sources.add("'self'");
@@ -98,8 +121,8 @@ export function connectSources(page, settings) {
 }
 
 /** A page as it is published: its policy names the addresses it was built with in place of any https address. */
-export function publishedPage(page, html, settings) {
-  const sources = connectSources(page, settings);
+export function publishedPage(page, html, settings, profile = PROFILES.testnet) {
+  const sources = connectSources(page, settings, profile);
   if (!sources) return html;
   if (html.split(ANY_ADDRESS).length !== 2) throw new Error(`${page}: its Content-Security-Policy has no connect-src to narrow`);
   return html.replace(ANY_ADDRESS, `connect-src ${sources.join(" ")};`);
@@ -113,6 +136,44 @@ const LANDING_LINKS = ["GITHUB_URL", "X_URL"];
 const LANDING_ADDRESSES = ["L2_TOKEN", "SWAP_ROUTER", "SWAP_FACTORY", "L1_STANDARD_BRIDGE", "L1_PORTAL", "L1_TOKEN"];
 
 const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** The profile's values a page names as {{L1_NAME}} and the like. */
+function profileValues(profile) {
+  return {
+    L1_NAME: profile.l1.name,
+    L1_SHORT: profile.l1.short,
+    L1_CHAIN_ID: String(profile.l1.id),
+    L1_EXPLORER: profile.l1.explorer,
+    L2_NAME: profile.l2.name,
+    L2_CHAIN_ID: String(profile.l2.id),
+    NATIVE: profile.native,
+    TOKEN: profile.token.symbol,
+  };
+}
+
+/**
+ * A page for the build's network. A line marked data-network="testnet" (or "mainnet") is kept only
+ * on that network, without the mark; the profile's values are written in. With `rest` "throw", a
+ * {{NAME}} left over stops the build; with "keep" it is left for landingPage.
+ */
+export function networkPage(html, profile, page, rest = "throw") {
+  const values = profileValues(profile);
+  const lines = [];
+  for (const line of html.split("\n")) {
+    const only = / data-network="([a-z]+)"/.exec(line);
+    if (!only) lines.push(line);
+    else if (!Object.hasOwn(PROFILES, only[1])) throw new Error(`${page}: data-network="${only[1]}" is not a network`);
+    else if (only[1] === profile.network) lines.push(line.replace(only[0], ""));
+  }
+  const out = lines.join("\n").replace(/\{\{([A-Z0-9_]+)\}\}/g, (whole, name) => {
+    if (Object.hasOwn(values, name)) return escapeHtml(values[name]);
+    if (rest === "throw") throw new Error(`${page}: no value for ${name}`);
+    return whole;
+  });
+  // A page never links to one this network's build does not make.
+  if (!profile.swap && /swap\.html/.test(out)) throw new Error(`${page}: links to the swap page, which ${profile.network} does not build`);
+  return out;
+}
 
 function httpsAddress(name, value, site) {
   let url;
@@ -133,10 +194,11 @@ function httpsAddress(name, value, site) {
  * link is not set. A value that is set and is not what the page can use throws, and so does a name
  * the page asks for that the build does not know.
  */
-export function landingPage(html, settings, page = "landing.html") {
+export function landingPage(html, settings, page = "landing.html", profile = PROFILES.testnet) {
   const setting = (name) => (settings[name] ?? "").trim();
   if ([...LANDING_SITES, "L2_RPC_URL", "CHAIN_ID"].some((name) => !setting(name))) return null;
-  const values = { CHAIN_NAME: setting("CHAIN_NAME") || "LONGYU Testnet", NATIVE_SYMBOL: setting("NATIVE_SYMBOL") || "tBNB" };
+  html = networkPage(html, profile, page, "keep");
+  const values = { CHAIN_NAME: setting("CHAIN_NAME") || profile.l2.name, NATIVE_SYMBOL: setting("NATIVE_SYMBOL") || profile.native };
   for (const name of LANDING_SITES) values[name] = httpsAddress(name, setting(name), true);
   connectSource("L2_RPC_URL", setting("L2_RPC_URL"));
   values.L2_RPC_URL = setting("L2_RPC_URL");
@@ -162,12 +224,22 @@ export function landingPage(html, settings, page = "landing.html") {
   });
 }
 
+/** The settings of one network that cannot be another's: CHAIN_ID, when set, is the profile's LONGYU. */
+export function checkNetwork(settings, profile) {
+  const chainId = (settings.CHAIN_ID ?? "").trim();
+  if (chainId && chainId !== String(profile.l2.id)) throw new Error(`CHAIN_ID ${chainId} is not LONGYU on ${profile.network} (${profile.l2.id}); set NETWORK`);
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const env = (name) => process.env[name] ?? "";
+  const profile = profileFor(env("NETWORK"));
+  const outAt = process.argv.indexOf("--out");
+  const out = outAt > 0 && process.argv[outAt + 1] ? process.argv[outAt + 1] : "dist";
   const apiUrl = process.env.API_URL ?? "http://localhost:8080";
+  checkNetwork({ CHAIN_ID: env("CHAIN_ID") }, profile);
   // Before anything is bundled: a bad address stops the build here.
   const settings = { API_URL: apiUrl, L2_RPC_URL: env("L2_RPC_URL"), L1_RPC_URL: env("L1_RPC_URL") };
-  const pages = PAGES.map((page) => [page, publishedPage(page, readFileSync(`src/${page}`, "utf8"), settings)]);
+  const pages = pagesFor(profile).map((page) => [page, publishedPage(page, networkPage(readFileSync(`src/${page}`, "utf8"), profile, page), settings, profile)]);
   const landingSettings = {
     ...settings,
     SITE_URL: env("SITE_URL"),
@@ -186,31 +258,41 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     L1_PORTAL: env("L1_PORTAL"),
     L1_TOKEN: env("L1_TOKEN"),
   };
-  const landing = landingPage(readFileSync("src/landing.html", "utf8"), landingSettings);
+  const landing = landingPage(readFileSync("src/landing.html", "utf8"), landingSettings, "landing.html", profile);
   if (landing !== null) {
-    pages.push(["landing.html", publishedPage("landing.html", landing, settings)]);
-    const developers = landingPage(readFileSync("src/developers.html", "utf8"), landingSettings, "developers.html");
-    pages.push(["developers.html", publishedPage("developers.html", developers, settings)]);
+    pages.push(["landing.html", publishedPage("landing.html", landing, settings, profile)]);
+    const developers = landingPage(readFileSync("src/developers.html", "utf8"), landingSettings, "developers.html", profile);
+    pages.push(["developers.html", publishedPage("developers.html", developers, settings, profile)]);
   }
-  mkdirSync("dist", { recursive: true });
+  mkdirSync(out, { recursive: true });
   await build({
-    entryPoints: { main: "src/main.ts", pay: "src/pay.ts", bridge: "src/bridge.ts", swap: "src/swap.ts", safe: "src/safe.ts", ...(landing === null ? {} : { landing: "src/landing.ts", developers: "src/developers.ts" }) },
+    entryPoints: {
+      main: "src/main.ts",
+      pay: "src/pay.ts",
+      bridge: "src/bridge.ts",
+      ...(profile.swap ? { swap: "src/swap.ts" } : {}),
+      safe: "src/safe.ts",
+      ...(landing === null ? {} : { landing: "src/landing.ts", developers: "src/developers.ts" }),
+    },
     bundle: true,
     minify: true,
     format: "esm",
     target: "es2022",
-    outdir: "dist",
+    outdir: out,
     define: {
+      // The network's profile (src/profile.ts). __NETWORK__ being set leaves the testnet fallback out.
+      __NETWORK__: JSON.stringify(profile.network),
+      __PROFILE__: JSON.stringify(profile),
       __API_URL__: JSON.stringify(apiUrl),
       // Baked-in network details so the page still works when the API is down.
       __FALLBACK_NETWORK__: JSON.stringify(process.env.CHAIN_ID ? {
         chainId: process.env.CHAIN_ID,
-        chainName: process.env.CHAIN_NAME ?? "LONGYU Testnet",
+        chainName: process.env.CHAIN_NAME ?? profile.l2.name,
         rpcUrl: process.env.RPC_URL,
         explorerUrl: process.env.EXPLORER_URL ?? "",
-        nativeCurrency: { name: "BNB", symbol: process.env.NATIVE_SYMBOL ?? "tBNB", decimals: 18 },
+        nativeCurrency: { name: "BNB", symbol: process.env.NATIVE_SYMBOL ?? profile.native, decimals: 18 },
         rewardToken: process.env.REWARD_TOKEN
-          ? { address: process.env.REWARD_TOKEN, name: process.env.TOKEN_NAME ?? "LONGYU Testnet Token", symbol: process.env.TOKEN_SYMBOL ?? "tLONG", decimals: 18 }
+          ? { address: process.env.REWARD_TOKEN, name: process.env.TOKEN_NAME ?? profile.token.name, symbol: process.env.TOKEN_SYMBOL ?? profile.token.symbol, decimals: 18 }
           : undefined,
         distributor: process.env.DISTRIBUTOR,
       } : null),
@@ -228,13 +310,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         explorerUrl: env("EXPLORER_URL"),
       }),
       // Checked by parseSwapConfig in src/swap-core.ts.
-      __SWAP_CONFIG__: JSON.stringify({
+      __SWAP_CONFIG__: JSON.stringify(profile.swap ? {
         router: env("SWAP_ROUTER"),
         factory: env("SWAP_FACTORY"),
         token: env("L2_TOKEN"),
         rpcUrl: env("L2_RPC_URL"),
         explorerUrl: env("EXPLORER_URL"),
-      }),
+      } : null),
       // Checked by parseSafeConfig in src/safe-core.ts.
       __SAFE_CONFIG__: JSON.stringify({
         l1RpcUrl: env("L1_RPC_URL"),
@@ -245,20 +327,20 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       __LANDING_CONFIG__: JSON.stringify({
         rpcUrl: env("L2_RPC_URL"),
         chainId: env("CHAIN_ID"),
-        chainName: env("CHAIN_NAME") || "LONGYU Testnet",
+        chainName: env("CHAIN_NAME") || profile.l2.name,
         explorerUrl: env("EXPLORER_URL"),
-        symbol: env("NATIVE_SYMBOL") || "tBNB",
+        symbol: env("NATIVE_SYMBOL") || profile.native,
       }),
     },
   });
-  for (const [page, html] of pages) writeFileSync(`dist/${page}`, html);
-  copyFileSync("src/favicon.svg", "dist/favicon.svg");
-  copyFileSync("src/mark.svg", "dist/mark.svg");
+  for (const [page, html] of pages) writeFileSync(`${out}/${page}`, html);
+  copyFileSync("src/favicon.svg", `${out}/favicon.svg`);
+  copyFileSync("src/mark.svg", `${out}/mark.svg`);
   if (landing !== null) {
-    copyFileSync("src/lockup.svg", "dist/lockup.svg");
-    copyFileSync("src/share.png", "dist/share.png");
+    copyFileSync("src/lockup.svg", `${out}/lockup.svg`);
+    copyFileSync("src/share.png", `${out}/share.png`);
     // The fonts, and the licence they are published under.
-    for (const name of readdirSync("src/fonts")) if (/\.woff2$|^OFL\.txt$/.test(name)) copyFileSync(`src/fonts/${name}`, `dist/${name}`);
+    for (const name of readdirSync("src/fonts")) if (/\.woff2$|^OFL\.txt$/.test(name)) copyFileSync(`src/fonts/${name}`, `${out}/${name}`);
   }
-  console.log(landing === null ? "built dist/ (without the landing and developer pages: their addresses are not all set)" : "built dist/");
+  console.log(`built ${out}/ for ${profile.network}${landing === null ? " (without the landing and developer pages: their addresses are not all set)" : ""}`);
 }

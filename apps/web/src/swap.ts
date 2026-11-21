@@ -34,7 +34,7 @@ import {
   type TransactionReceipt,
 } from "viem";
 import { chainConfig, publicActionsL2 } from "viem/op-stack";
-import { DECIMALS, L2_CHAIN_ID, formatAmount, gasReserve, isUnknownChain, l2TxUrl, longyuChainParams, parseAmount, shareAmount, shortHex } from "./bridge-core.ts";
+import { DECIMALS, L2_CHAIN_ID, NATIVE, TOKEN, formatAmount, gasReserve, isUnknownChain, l2TxUrl, longyuChainParams, parseAmount, shareAmount, shortHex } from "./bridge-core.ts";
 import {
   DEADLINE_SECONDS,
   HIGH_IMPACT_BPS,
@@ -62,6 +62,7 @@ import {
   type Reserves,
   type SwapConfig,
 } from "./swap-core.ts";
+import { PROFILE } from "./profile.ts";
 
 declare const __SWAP_CONFIG__: RawSwapConfig;
 declare global {
@@ -75,7 +76,8 @@ const show = (id: string, on: boolean) => ($(id).hidden = !on);
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 
 type Mode = "swap" | "add" | "remove";
-type Asset = "tBNB" | "tLONG";
+/** NATIVE or TOKEN. */
+type Asset = string;
 interface Pool {
   pair: Address;
   /** True when the pair's token0 is WBNB. */
@@ -118,13 +120,13 @@ function start(cfg: SwapConfig): void {
   const longyu = defineChain({
     ...chainConfig,
     id: L2_CHAIN_ID,
-    name: "LONGYU Testnet",
-    nativeCurrency: { name: "BNB", symbol: "tBNB", decimals: DECIMALS },
+    name: PROFILE.l2.name,
+    nativeCurrency: { name: "BNB", symbol: NATIVE, decimals: DECIMALS },
     rpcUrls: { default: { http: [cfg.rpcUrl] } },
     ...(cfg.explorerUrl ? { blockExplorers: { default: { name: "LONGYU Explorer", url: cfg.explorerUrl } } } : {}),
     blockTime: 250,
     contracts: { ...chainConfig.contracts, multicall3: { address: MULTICALL3 } },
-    testnet: true,
+    ...PROFILE.l2.chain,
   });
   // Reads go to the configured RPC, never through the wallet, so they do not depend on its network.
   const l2 = createPublicClient({ chain: longyu, transport: http(cfg.rpcUrl) }).extend(publicActionsL2());
@@ -134,7 +136,7 @@ function start(cfg: SwapConfig): void {
 
   let mode: Mode = "swap";
   /** The asset paid in a swap. */
-  let pay: Asset = "tBNB";
+  let pay: Asset = NATIVE;
   let slippage: number = SLIPPAGE_CHOICES[0];
   let percent = 100;
   /** The amount the visitor typed last when adding liquidity; the other one follows the pool's ratio. */
@@ -146,10 +148,10 @@ function start(cfg: SwapConfig): void {
   let pairAddress: Address | null = null;
   let pool: Pool | null = null;
   let held: Holdings | null = null;
-  /** The last gas price read, for what a share of tBNB leaves behind. */
+  /** The last gas price read, for what a share of BNB leaves behind. */
   let gasPrice = 0n;
   /** The assets of the two amount fields, first field first. */
-  const sides = (): [Asset, Asset] => (mode === "swap" && pay === "tLONG" ? ["tLONG", "tBNB"] : ["tBNB", "tLONG"]);
+  const sides = (): [Asset, Asset] => (mode === "swap" && pay === TOKEN ? [TOKEN, NATIVE] : [NATIVE, TOKEN]);
 
   // ---------------------------------------------------------------- wiring check
 
@@ -263,7 +265,7 @@ function start(cfg: SwapConfig): void {
   function swapQuote(): Quote | null {
     const amountIn = parseAmount(a.value);
     if (!live(pool) || !amountIn) return null;
-    const [reserveIn, reserveOut] = pay === "tBNB" ? [pool.reserves.bnb, pool.reserves.long] : [pool.reserves.long, pool.reserves.bnb];
+    const [reserveIn, reserveOut] = pay === NATIVE ? [pool.reserves.bnb, pool.reserves.long] : [pool.reserves.long, pool.reserves.bnb];
     const out = amountOut(amountIn, reserveIn, reserveOut);
     return { amountIn, out, min: minimumOut(out, slippage), impact: impactBps(amountIn, out, reserveIn, reserveOut) };
   }
@@ -295,7 +297,7 @@ function start(cfg: SwapConfig): void {
     const eth = provider();
     const current = async () => Number(await eth.request({ method: "eth_chainId" }));
     if ((await current()) === L2_CHAIN_ID) return;
-    setStatus("Switch your wallet to LONGYU Testnet");
+    setStatus(`Switch your wallet to ${PROFILE.l2.name}`);
     const chainId = toHex(L2_CHAIN_ID);
     try {
       await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
@@ -304,7 +306,7 @@ function start(cfg: SwapConfig): void {
       await eth.request({ method: "wallet_addEthereumChain", params: [longyuChainParams({ l2RpcUrl: cfg.rpcUrl, explorerUrl: cfg.explorerUrl })] });
       if ((await current()) !== L2_CHAIN_ID) await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId }] });
     }
-    if ((await current()) !== L2_CHAIN_ID) throw new Error("Switch your wallet to LONGYU Testnet.");
+    if ((await current()) !== L2_CHAIN_ID) throw new Error(`Switch your wallet to ${PROFILE.l2.name}.`);
   }
 
   const l2Wallet = () => createWalletClient({ chain: longyu, transport: custom(provider()) });
@@ -330,7 +332,7 @@ function start(cfg: SwapConfig): void {
       l2.estimateL1Fee({ ...request, chain: longyu }).catch(() => 0n),
       l2.getBalance({ address: from }),
     ]);
-    if (native < tx.value + gas * price + dataFee) throw new Error(tx.value > 0n ? "Not enough tBNB for this amount plus gas." : "Not enough tBNB for gas.");
+    if (native < tx.value + gas * price + dataFee) throw new Error(tx.value > 0n ? `Not enough ${NATIVE} for this amount plus gas.` : `Not enough ${NATIVE} for gas.`);
     await ensureChain();
     setStatus(confirm);
     const hash = await l2Wallet().sendTransaction(request);
@@ -367,13 +369,13 @@ function start(cfg: SwapConfig): void {
     return amount;
   }
   function has(holdings: Holdings, asset: Asset, amount: bigint): void {
-    const balance = asset === "tBNB" ? holdings.bnb : holdings.long;
+    const balance = asset === NATIVE ? holdings.bnb : holdings.long;
     if (balance < amount) throw new Error(`Not enough ${asset}: ${formatShort(balance)}.`);
   }
 
   async function swap(from: Address): Promise<void> {
     typed(a);
-    const [paid, got]: [Asset, Asset] = pay === "tBNB" ? ["tBNB", "tLONG"] : ["tLONG", "tBNB"];
+    const [paid, got]: [Asset, Asset] = pay === NATIVE ? [NATIVE, TOKEN] : [TOKEN, NATIVE];
     const shown = swapQuote();
     const fresh = await reload(from);
     const now = swapQuote();
@@ -386,7 +388,7 @@ function start(cfg: SwapConfig): void {
     has(fresh.held, paid, amount);
     const label = `${formatAmount(amount)} ${paid}`;
     let receipt: TransactionReceipt;
-    if (paid === "tBNB") {
+    if (paid === NATIVE) {
       const data = encodeFunctionData({ abi: routerAbi, functionName: "swapExactETHForTokens", args: [quoted.min, [WBNB, cfg.token], from, await deadline()] });
       receipt = await transact(from, { to: cfg.router, data, value: amount }, `Confirm the swap of ${label}`, "Swap on LONGYU");
     } else {
@@ -396,7 +398,7 @@ function start(cfg: SwapConfig): void {
     }
     // What the pool paid out, from its own event.
     const pair = fresh.pool.pair;
-    const outFirst = (got === "tBNB") === fresh.pool.bnbFirst;
+    const outFirst = (got === NATIVE) === fresh.pool.bnbFirst;
     const swaps = parseEventLogs({ abi: pairAbi, eventName: "Swap", logs: receipt.logs.filter((l) => same(l.address, pair)) });
     const received = swaps.reduce((sum, e) => sum + (outFirst ? e.args.amount0Out : e.args.amount1Out), 0n);
     a.value = "";
@@ -410,12 +412,12 @@ function start(cfg: SwapConfig): void {
     const fresh = await reload(from);
     const bnb = typed(a);
     const long = typed(b);
-    has(fresh.held, "tBNB", bnb);
-    has(fresh.held, "tLONG", long);
-    const step = await approve(cfg.token, long, from, `${formatAmount(long)} tLONG`);
+    has(fresh.held, NATIVE, bnb);
+    has(fresh.held, TOKEN, long);
+    const step = await approve(cfg.token, long, from, `${formatAmount(long)} ${TOKEN}`);
     const args = [cfg.token, long, minimumOut(long, slippage), minimumOut(bnb, slippage), from, await deadline()] as const;
     const data = encodeFunctionData({ abi: routerAbi, functionName: "addLiquidityETH", args });
-    await transact(from, { to: cfg.router, data, value: bnb }, `${step}Confirm the deposit of ${formatAmount(bnb)} tBNB and ${formatAmount(long)} tLONG`, "Deposit on LONGYU");
+    await transact(from, { to: cfg.router, data, value: bnb }, `${step}Confirm the deposit of ${formatAmount(bnb)} ${NATIVE} and ${formatAmount(long)} ${TOKEN}`, "Deposit on LONGYU");
     a.value = b.value = "";
     setStatus("Liquidity added.");
   }
@@ -435,14 +437,14 @@ function start(cfg: SwapConfig): void {
 
   // ---------------------------------------------------------------- form
 
-  const pair = (r: Reserves) => `${formatShort(r.bnb)} tBNB · ${formatShort(r.long)} tLONG`;
+  const pair = (r: Reserves) => `${formatShort(r.bnb)} ${NATIVE} · ${formatShort(r.long)} ${TOKEN}`;
 
   function render(): void {
     for (const m of ["swap", "add", "remove"]) $(`mode-${m}`).setAttribute("aria-pressed", String(mode === m));
     const [first, second] = sides();
     // The pool once it holds both assets; null before the first deposit.
     const open = live(pool) ? pool : null;
-    const balance = (asset: Asset) => (held ? formatShort(asset === "tBNB" ? held.bnb : held.long) : "–");
+    const balance = (asset: Asset) => (held ? formatShort(asset === NATIVE ? held.bnb : held.long) : "–");
 
     show("boxes", mode !== "remove");
     show("flip", mode === "swap");
@@ -465,8 +467,8 @@ function start(cfg: SwapConfig): void {
     $("rate").textContent = !open
       ? "–"
       : open.reserves.long >= open.reserves.bnb
-        ? `1 tBNB = ${formatShort(quote(10n ** BigInt(DECIMALS), open.reserves.bnb, open.reserves.long))} tLONG`
-        : `1 tLONG = ${formatShort(quote(10n ** BigInt(DECIMALS), open.reserves.long, open.reserves.bnb))} tBNB`;
+        ? `1 ${NATIVE} = ${formatShort(quote(10n ** BigInt(DECIMALS), open.reserves.bnb, open.reserves.long))} ${TOKEN}`
+        : `1 ${TOKEN} = ${formatShort(quote(10n ** BigInt(DECIMALS), open.reserves.long, open.reserves.bnb))} ${NATIVE}`;
     $("pool").textContent = open ? pair(open.reserves) : "–";
     $("note").textContent = !loaded || open || mode === "remove" ? "" : mode === "swap" ? NO_POOL : "The first deposit sets the rate.";
 
@@ -508,7 +510,7 @@ function start(cfg: SwapConfig): void {
       a.value = b.value = "";
     }
     if (next.flip) {
-      pay = pay === "tBNB" ? "tLONG" : "tBNB";
+      pay = pay === NATIVE ? TOKEN : NATIVE;
       a.value = "";
     }
     clear();
@@ -567,12 +569,12 @@ function start(cfg: SwapConfig): void {
         if (!held) return;
         const asset = sides()[side === "a" ? 0 : 1];
         const share = Number(node.dataset.share);
-        // tBNB also pays for gas, so a share of it leaves some behind.
-        const amount = asset === "tBNB" ? shareAmount(held.bnb, share, gasReserve(gasPrice)) : shareAmount(held.long, share);
+        // BNB also pays for gas, so a share of it leaves some behind.
+        const amount = asset === NATIVE ? shareAmount(held.bnb, share, gasReserve(gasPrice)) : shareAmount(held.long, share);
         (side === "a" ? a : b).value = amount > 0n ? formatAmount(amount) : "";
         edited = side;
         clear();
-        if (amount === 0n) $("error").textContent = asset === "tBNB" && held.bnb > 0n ? "Not enough tBNB to leave for gas." : `No ${asset} here yet.`;
+        if (amount === 0n) $("error").textContent = asset === NATIVE && held.bnb > 0n ? `Not enough ${NATIVE} to leave for gas.` : `No ${asset} here yet.`;
         render();
       };
     });
@@ -587,7 +589,7 @@ function start(cfg: SwapConfig): void {
     });
   $("watch").onclick = () =>
     run(async () => {
-      await provider().request({ method: "wallet_watchAsset", params: { type: "ERC20", options: { address: cfg.token, symbol: "tLONG", decimals: DECIMALS } } });
+      await provider().request({ method: "wallet_watchAsset", params: { type: "ERC20", options: { address: cfg.token, symbol: TOKEN, decimals: DECIMALS } } });
     });
 
   const eth = window.ethereum;

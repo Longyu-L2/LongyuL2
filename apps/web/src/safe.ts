@@ -1,5 +1,5 @@
 /**
- * Safe page: the signers of a Safe v1.3.0 multisig on BSC testnet or LONGYU create a transaction,
+ * Safe page: the signers of a Safe v1.3.0 multisig on BSC or LONGYU create a transaction,
  * approve it and execute it, each with their own wallet. Nothing here holds a key, and there is no
  * server: the transaction travels in the page's link and every approval is on the chain.
  *
@@ -28,10 +28,10 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { bscTestnet } from "viem/chains";
 import { chainConfig, publicActionsL2 } from "viem/op-stack";
 import { DECIMALS, L1_CHAIN_ID, L1_EXPLORER, L2_CHAIN_ID, formatAmount, isUnknownChain, l1TxUrl, l2TxUrl, longyuChainParams, parseAddress, parseAmount, shortHex } from "./bridge-core.ts";
 import { MULTICALL3, multicallAbi } from "./swap-core.ts";
+import { L1_CHAIN, PROFILE } from "./profile.ts";
 import {
   CALLS,
   CHAIN_NAMES,
@@ -110,19 +110,19 @@ function start(cfg: SafeConfig): void {
   const longyu = defineChain({
     ...chainConfig,
     id: L2_CHAIN_ID,
-    name: "LONGYU Testnet",
-    nativeCurrency: { name: "BNB", symbol: "tBNB", decimals: DECIMALS },
+    name: PROFILE.l2.name,
+    nativeCurrency: { name: "BNB", symbol: PROFILE.native, decimals: DECIMALS },
     rpcUrls: { default: { http: [cfg.l2RpcUrl] } },
     ...(cfg.explorerUrl ? { blockExplorers: { default: { name: "LONGYU Explorer", url: cfg.explorerUrl } } } : {}),
     blockTime: 250,
     contracts: { ...chainConfig.contracts, multicall3: { address: MULTICALL3 } },
-    testnet: true,
+    ...PROFILE.l2.chain,
   });
   // Reads go to the configured RPCs, never through the wallet, so they do not depend on its network.
-  const l1 = createPublicClient({ chain: bscTestnet, transport: http(cfg.l1RpcUrl) });
+  const l1 = createPublicClient({ chain: L1_CHAIN, transport: http(cfg.l1RpcUrl) });
   const l2 = createPublicClient({ chain: longyu, transport: http(cfg.l2RpcUrl) }).extend(publicActionsL2());
   const reader = (chainId: SafeChainId) => (chainId === L1_CHAIN_ID ? l1 : l2);
-  const bscParams = { chainId: toHex(L1_CHAIN_ID), chainName: bscTestnet.name, nativeCurrency: bscTestnet.nativeCurrency, rpcUrls: [cfg.l1RpcUrl], blockExplorerUrls: [L1_EXPLORER] };
+  const bscParams = { chainId: toHex(L1_CHAIN_ID), chainName: L1_CHAIN.name, nativeCurrency: L1_CHAIN.nativeCurrency, rpcUrls: [cfg.l1RpcUrl], blockExplorerUrls: [L1_EXPLORER] };
 
   const safeInput = $("safe") as HTMLInputElement;
   const callSelect = $("call") as HTMLSelectElement;
@@ -281,10 +281,10 @@ function start(cfg: SafeConfig): void {
       client.getBalance({ address: from }),
     ]);
     const gas = estimate + estimate / 4n + 10_000n;
-    if (native < gas * price + dataFee) throw new Error("Not enough tBNB for gas.");
+    if (native < gas * price + dataFee) throw new Error(`Not enough ${PROFILE.native} for gas.`);
     await ensureChain(chainId);
     setStatus(confirm);
-    const wallet = createWalletClient({ chain: chainId === L1_CHAIN_ID ? bscTestnet : longyu, transport: custom(provider()) });
+    const wallet = createWalletClient({ chain: chainId === L1_CHAIN_ID ? L1_CHAIN : longyu, transport: custom(provider()) });
     const hash = await wallet.sendTransaction({ ...request, gas });
     setLink(chainId, hash, linkText);
     setStatus(`Confirming on ${CHAIN_NAMES[chainId]}…`);
@@ -413,7 +413,7 @@ function start(cfg: SafeConfig): void {
 
     if (info) {
       $("threshold").textContent = `${info.threshold} of ${info.owners.length}`;
-      $("balance").textContent = `${formatAmount(info.balance)} tBNB`;
+      $("balance").textContent = `${formatAmount(info.balance)} ${PROFILE.native}`;
       $("nonce").textContent = info.nonce.toString();
       const warnings = [info.modules > 0 ? "This Safe has a module, which can move its funds without the signers." : "", info.guard ? "This Safe has a guard, which can block its transactions." : ""];
       $("warn").textContent = warnings.filter(Boolean).join(" ");
@@ -424,7 +424,7 @@ function start(cfg: SafeConfig): void {
     if (info && link && tx) {
       const decoded = decodeCall(tx.data);
       $("t-to").textContent = same(tx.to, link.safe) ? `${tx.to} (this Safe)` : tx.to;
-      $("t-value").textContent = `${formatAmount(tx.value)} tBNB`;
+      $("t-value").textContent = `${formatAmount(tx.value)} ${PROFILE.native}`;
       $("t-call").textContent = tx.data === "0x" ? "None" : decoded ? decoded.call.fn.name : "Unknown";
       $("t-call").classList.toggle("bad", tx.data !== "0x" && !decoded);
       $("t-args").replaceChildren(...(decoded?.args ?? []).map((a) => rowOf(`${a.name} · ${a.type}`, a.value)));
@@ -481,7 +481,7 @@ function start(cfg: SafeConfig): void {
     node.textContent = text;
     return node;
   };
-  callSelect.append(option("", "None, send tBNB only"), ...CALLS.filter((c) => c.simple).map((c) => option(c.selector, c.signature)), option("raw", "Raw data"));
+  callSelect.append(option("", `None, send ${PROFILE.native} only`), ...CALLS.filter((c) => c.simple).map((c) => option(c.selector, c.signature)), option("raw", "Raw data"));
   callSelect.onchange = () => {
     const call = CALLS.find((c) => c.selector === callSelect.value);
     show("raw-box", callSelect.value === "raw");

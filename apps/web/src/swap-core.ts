@@ -6,7 +6,7 @@
  * the amount paid in, and a router whose "ETH" functions take the chain's native asset, BNB.
  */
 import { parseAbi, type Address } from "viem";
-import { DECIMALS, errorMessage, parseAddress, parseUrl } from "./bridge-core.ts";
+import { DECIMALS, TOKEN, errorMessage, parseAddress, parseUrl } from "./bridge-core.ts";
 
 /** Wrapped BNB, built into the chain; the router's wrapped token. */
 export const WBNB: Address = "0x4200000000000000000000000000000000000006";
@@ -111,7 +111,7 @@ export function swapWiringProblems(o: SwapObserved, cfg: SwapConfig, chainId: nu
   if (o.chainId !== chainId) p.push(`L2_RPC_URL serves chain ${o.chainId}, not ${chainId}`);
   if (!same(o.routerFactory, cfg.factory)) p.push("SWAP_FACTORY is not the router's factory");
   if (!same(o.routerWrapped, WBNB)) p.push("the router's wrapped token is not WBNB");
-  if (o.tokenDecimals !== DECIMALS) p.push("tLONG must have 18 decimals");
+  if (o.tokenDecimals !== DECIMALS) p.push(`${TOKEN} must have 18 decimals`);
   return p;
 }
 

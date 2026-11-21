@@ -77,7 +77,9 @@ export async function computeHealth(deps: Deps): Promise<Health> {
     if (c.watch === null) add("watch", "warn", "no watch key: a root that was not computed here waits for a person");
     else if (!c.watch.guardian) add("watch", "critical", "the watch key is not a guardian of the distributor: it cannot stop a root");
     else add("watch", level(c.watch.balance < minGas / 5n, c.watch.balance < minGas), `guardian, ${fmt(c.watch.balance)} gas (warn below ${fmt(minGas)})`);
-    if (c.vaultBalance !== null) {
+    if (c.vaultBalance !== null && now < deps.schedule.startTime) {
+      add("vault runway", "ok", `mining starts ${new Date(Number(deps.schedule.startTime) * 1000).toISOString().slice(0, 10)}`);
+    } else if (c.vaultBalance !== null) {
       const perDay = dailyBudget(deps.schedule, currentDay(deps));
       const days = perDay === 0n ? null : c.vaultBalance / perDay;
       add("vault runway", days === null ? "ok" : level(days < 2n, days < 14n), days === null ? "emission finished" : `${days} days at today's budget`);

@@ -108,6 +108,7 @@ for old, new in (
     src = src.replace(old, new)
 open(path, "w").write(src)
 PY
+# CONFIG_RPC: another endpoint of the same BSC for the deploy config's block lookup, if node cannot reach $L1.
 SKIP=(--skip "src/periphery/**" --skip "test/**" --skip "scripts/periphery/**")
 (cd "$BEDROCK" && forge build "${SKIP[@]}")
 CONFIG_IN="$BEDROCK/deploy-config/longyu-$L2_CHAIN-$MODE.json"
@@ -149,7 +150,7 @@ export ETH_RPC_URL="$L1"
 
 # ------------------------------------------------------------------ deploy
 say "Writing the deploy config (starting from the $BLOCK_TAG BSC block)"
-NETWORK="$NETWORK" L1_RPC_URL="$L1" L1_BLOCK_TAG="$BLOCK_TAG" ADMIN="$DEPLOYER" SEQUENCER="$SEQUENCER" BATCHER="$BATCHER" PROPOSER="$PROPOSER" \
+NETWORK="$NETWORK" L1_RPC_URL="${CONFIG_RPC:-$L1}" L1_BLOCK_TAG="$BLOCK_TAG" ADMIN="$DEPLOYER" SEQUENCER="$SEQUENCER" BATCHER="$BATCHER" PROPOSER="$PROPOSER" \
   CHALLENGER="$CHALLENGER" SAFE="$SAFE" node --experimental-strip-types --no-warnings "$REPO/chain/testnet/deploy-config.ts" > "$OUT/deploy-config.json"
 cp "$OUT/deploy-config.json" "$CONFIG_IN"
 rm -f "$DEPLOYED" "$ALLOCS"

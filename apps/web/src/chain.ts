@@ -1,4 +1,5 @@
 /** Pure helpers for the claim page (tested under Node). */
+import { PROFILE } from "./profile.ts";
 
 export interface NetworkInfo {
   chainId: string;
@@ -32,9 +33,9 @@ export function trustedNetwork(api: NetworkInfo | null, builtIn: NetworkInfo | n
   return sameChain && sameContract ? answer : builtIn;
 }
 
-/** Symbol of the reward asset: tLONG on LONGYU, where the native token is BNB. */
+/** Symbol of the reward asset: the mined token on LONGYU, where the native token is BNB. */
 export function rewardSymbol(n: NetworkInfo): string {
-  return n.rewardToken === null ? n.nativeCurrency.symbol : n.rewardToken?.symbol ?? "tLONG";
+  return n.rewardToken === null ? n.nativeCurrency.symbol : n.rewardToken?.symbol ?? PROFILE.token.symbol;
 }
 
 /** EIP-747 parameters so the wallet shows the reward token. Null when there is no token to add. */

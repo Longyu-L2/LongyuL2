@@ -1,6 +1,16 @@
 const path = require("path");
 const { getDefaultConfig } = require("expo/metro-config");
 
+/**
+ * The variant APP_VARIANT picks (app.config.ts), for the app's code as process.env.EXPO_PUBLIC_APP_VARIANT.
+ * A release build fixes it into the bundle and leaves out what only the other variants use: the mainnet
+ * app (production) holds no testnet text or addresses. Set here, before the bundler starts its workers.
+ */
+const VARIANTS = ["development", "testnet", "production"];
+const variant = process.env.APP_VARIANT || "development";
+if (!VARIANTS.includes(variant)) throw new Error(`APP_VARIANT must be one of ${VARIANTS.join(", ")}`);
+process.env.EXPO_PUBLIC_APP_VARIANT = variant;
+
 const config = getDefaultConfig(__dirname);
 
 /**

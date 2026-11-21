@@ -23,6 +23,8 @@ npm test -w @longyu/web
 
 Contract addresses and RPC addresses are read from the environment at build time and are never guessed: a page whose address is missing or invalid builds closed, shows that it is not open yet, and no action on it works. The variables are listed at the top of [build.mjs](build.mjs).
 
+`NETWORK` (`testnet`, the default, or `mainnet`) picks the network's profile in [src/networks.json](src/networks.json): BSC's chain and BscScan, LONGYU's chain id and name, the symbols. Only that profile reaches the built files. A mainnet build has no swap page and links to none, its bridge moves BNB only (LONG is locked until the TGE), and it stops when `CHAIN_ID` is not 668800. On mainnet `PAGES` must not name `swap`.
+
 The build also writes each page's Content-Security-Policy. A page may send requests only to the API and RPC addresses it was built with, and runs no inline script.
 
 ## Serve

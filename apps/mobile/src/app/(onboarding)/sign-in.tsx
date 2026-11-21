@@ -6,6 +6,7 @@ import { useApp } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
 import { invitedWith } from "@/lib/invite-link";
 import { embeddedBrowser } from "@/lib/x-auth";
+import { MAINNET } from "@/lib/variant";
 import { colors, radius, space } from "@/design/tokens";
 import { useWide } from "@/design/layout";
 import { Brand, Button, ErrorText, Input, Notice, Screen, T } from "@/components/ui";
@@ -79,7 +80,7 @@ export default function SignInScreen() {
           <View style={styles.panel}>
             <T variant="title" accessibilityRole="header">{t("signInTitle")}</T>
             {form}
-            <T variant="small" color={colors.textFaint}>{t("testnetNotice")}</T>
+            {MAINNET ? null : <T variant="small" color={colors.textFaint}>{t("rewardValueNotice")}</T>}
           </View>
         </View>
       </Screen>
@@ -96,7 +97,7 @@ export default function SignInScreen() {
         </View>
       </View>
       {form}
-      <T variant="small" color={colors.textFaint} center>{t("testnetNotice")}</T>
+      {MAINNET ? null : <T variant="small" color={colors.textFaint} center>{t("rewardValueNotice")}</T>}
     </Screen>
   );
 }

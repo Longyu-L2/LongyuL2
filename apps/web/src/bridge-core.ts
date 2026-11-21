@@ -16,12 +16,17 @@ import {
   type Address,
   type Hex,
 } from "viem";
+import { PROFILE } from "./profile.ts";
 
-export const L1_CHAIN_ID = 97;
-export const L2_CHAIN_ID = 668801;
+/** BNB Smart Chain and LONGYU, as the build's network has them (src/profile.ts). */
+export const L1_CHAIN_ID = PROFILE.l1.id;
+export const L2_CHAIN_ID = PROFILE.l2.id;
 export const DECIMALS = 18;
-export const DEFAULT_L1_RPC = "https://bsc-testnet-rpc.publicnode.com";
-export const L1_EXPLORER = "https://testnet.bscscan.com";
+export const DEFAULT_L1_RPC = PROFILE.l1.rpc;
+export const L1_EXPLORER = PROFILE.l1.explorer;
+/** The native token, and the mined token, by symbol. */
+export const NATIVE = PROFILE.native;
+export const TOKEN = PROFILE.token.symbol;
 
 /** L2 predeploys (opbnb src/libraries/Predeploys.sol). */
 export const L2_STANDARD_BRIDGE: Address = "0x4200000000000000000000000000000000000010";
@@ -95,8 +100,9 @@ export interface BridgeConfig {
   l1Portal: Address;
   l1OutputOracle: Address;
   l1StandardBridge: Address;
-  l1Token: Address;
-  l2Token: Address;
+  /** The mined token on BSC and on LONGYU; null on a network where it does not move yet. */
+  l1Token: Address | null;
+  l2Token: Address | null;
   l2RpcUrl: string;
   l1RpcUrl: string;
   /** LONGYU explorer base URL without a trailing slash; null when not configured. */
@@ -112,6 +118,7 @@ const ADDRESS_ENV = {
   l1Token: "L1_TOKEN",
   l2Token: "L2_TOKEN",
 } as const;
+const TOKEN_KEYS: readonly string[] = ["l1Token", "l2Token"];
 
 /** A checksummed address, or null for anything malformed, wrongly checksummed or zero. */
 export function parseAddress(value: string | null | undefined): Address | null {
@@ -135,20 +142,24 @@ export function parseUrl(value: string | null | undefined): string | null {
   return v;
 }
 
-/** Checks every build-time value. Addresses are never guessed: a missing or bad one closes the bridge. */
-export function parseConfig(raw: RawConfig | null | undefined): ConfigResult {
+/**
+ * Checks every build-time value. Addresses are never guessed: a missing or bad one closes the bridge.
+ * Where the mined token does not move yet (`withToken` false), its two addresses are not read.
+ */
+export function parseConfig(raw: RawConfig | null | undefined, withToken = PROFILE.bridgeToken): ConfigResult {
   const r = raw ?? {};
   const problems: string[] = [];
-  const addresses = {} as Record<keyof typeof ADDRESS_ENV, Address>;
+  const addresses = { l1Token: null, l2Token: null } as Record<keyof typeof ADDRESS_ENV, Address | null>;
   for (const [key, env] of Object.entries(ADDRESS_ENV) as [keyof typeof ADDRESS_ENV, string][]) {
+    if (!withToken && TOKEN_KEYS.includes(key)) continue;
     const value = (r[key] ?? "").trim();
     const parsed = parseAddress(value);
     if (!value) problems.push(`${env} is missing`);
     else if (!parsed) problems.push(`${env} is not a valid address`);
     else addresses[key] = parsed;
   }
-  const seen = new Set(Object.values(addresses).map((a) => a.toLowerCase()));
-  if (seen.size !== Object.keys(addresses).length) problems.push("two of the addresses are the same");
+  const set = Object.values(addresses).filter((a): a is Address => a !== null);
+  if (new Set(set.map((a) => a.toLowerCase())).size !== set.length) problems.push("two of the addresses are the same");
 
   const l2RpcUrl = parseUrl(r.l2RpcUrl);
   if (!(r.l2RpcUrl ?? "").trim()) problems.push("L2_RPC_URL is missing");
@@ -161,7 +172,9 @@ export function parseConfig(raw: RawConfig | null | undefined): ConfigResult {
     if (!explorerUrl) problems.push("EXPLORER_URL is not an https URL");
   }
   if (problems.length || !l2RpcUrl || !l1RpcUrl) return { ok: false, problems };
-  return { ok: true, config: { ...addresses, l2RpcUrl, l1RpcUrl, explorerUrl } };
+  const { l1Portal, l1OutputOracle, l1StandardBridge, l1Token, l2Token } = addresses;
+  if (!l1Portal || !l1OutputOracle || !l1StandardBridge) return { ok: false, problems };
+  return { ok: true, config: { l1Portal, l1OutputOracle, l1StandardBridge, l1Token, l2Token, l2RpcUrl, l1RpcUrl, explorerUrl } };
 }
 
 // ------------------------------------------------------------------ amounts
@@ -193,7 +206,7 @@ const RESERVE_GAS = 500_000n;
 const RESERVE_FLOOR = 50_000_000_000_000n;
 
 /**
- * What stays in the wallet when a share of tBNB is picked, since tBNB also pays for gas: enough at
+ * What stays in the wallet when a share of BNB is picked, since BNB also pays for gas: enough at
  * this gas price for an approval and the transaction after it, and never under 0.00005.
  */
 export function gasReserve(gasPrice: bigint): bigint {
@@ -339,7 +352,7 @@ export interface WithdrawalMessage {
 export function describeWithdrawal(w: WithdrawalMessage, cfg: Pick<BridgeConfig, "l1StandardBridge" | "l1Token" | "l2Token">) {
   const none = { asset: null, amount: null, to: null } as const;
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-  if (w.data === "0x") return w.value > 0n ? { asset: "tBNB" as const, amount: w.value, to: getAddress(w.target) } : none;
+  if (w.data === "0x") return w.value > 0n ? { asset: NATIVE, amount: w.value, to: getAddress(w.target) } : none;
   if (!same(w.sender, L2_CROSS_DOMAIN_MESSENGER)) return none;
   try {
     const relay = decodeFunctionData({ abi: messengerAbi, data: w.data });
@@ -347,9 +360,9 @@ export function describeWithdrawal(w: WithdrawalMessage, cfg: Pick<BridgeConfig,
     const [, sender, target, , , message] = relay.args;
     if (!same(sender, L2_STANDARD_BRIDGE) || !same(target, cfg.l1StandardBridge)) return none;
     const inner = decodeFunctionData({ abi: finalizeBridgeAbi, data: message });
-    if (inner.functionName === "finalizeBridgeETH") return { asset: "tBNB" as const, amount: inner.args[2], to: inner.args[1] };
+    if (inner.functionName === "finalizeBridgeETH") return { asset: NATIVE, amount: inner.args[2], to: inner.args[1] };
     const [localToken, remoteToken, , to, amount] = inner.args;
-    if (same(localToken, cfg.l1Token) && same(remoteToken, cfg.l2Token)) return { asset: "tLONG" as const, amount, to };
+    if (cfg.l1Token && cfg.l2Token && same(localToken, cfg.l1Token) && same(remoteToken, cfg.l2Token)) return { asset: TOKEN, amount, to };
   } catch {
     // not a standard-bridge message
   }
@@ -380,11 +393,11 @@ export interface Observed {
   l2OtherBridge: string;
   /** L2CrossDomainMessenger.otherMessenger() */
   l2OtherMessenger: string;
-  /** L2 tLONG remoteToken() and bridge() */
-  l2TokenRemote: string;
-  l2TokenBridge: string;
-  l1TokenDecimals: number;
-  l2TokenDecimals: number;
+  /** L2 token remoteToken() and bridge(), and both tokens' decimals; absent where the token does not move. */
+  l2TokenRemote?: string;
+  l2TokenBridge?: string;
+  l1TokenDecimals?: number;
+  l2TokenDecimals?: number;
 }
 
 /** Major version of a semver string such as "2.8.1-beta.1"; NaN when malformed. */
@@ -406,9 +419,10 @@ export function wiringProblems(o: Observed, cfg: BridgeConfig): string[] {
   if (!same(o.messengerPortal, cfg.l1Portal)) p.push("L1_PORTAL is not the portal of the bridge's messenger");
   if (!same(o.l2OtherBridge, cfg.l1StandardBridge)) p.push("L1_STANDARD_BRIDGE is not LONGYU's L1 bridge");
   if (!same(o.l2OtherMessenger, o.bridgeMessenger)) p.push("the L1 bridge's messenger is not LONGYU's");
-  if (!same(o.l2TokenRemote, cfg.l1Token)) p.push("L2_TOKEN is not the LONGYU copy of L1_TOKEN");
-  if (!same(o.l2TokenBridge, L2_STANDARD_BRIDGE)) p.push("L2_TOKEN is not minted by the L2 standard bridge");
-  if (o.l1TokenDecimals !== DECIMALS || o.l2TokenDecimals !== DECIMALS) p.push("tLONG must have 18 decimals on both chains");
+  if (cfg.l1Token === null || cfg.l2Token === null) return p;
+  if (!same(o.l2TokenRemote ?? "", cfg.l1Token)) p.push("L2_TOKEN is not the LONGYU copy of L1_TOKEN");
+  if (!same(o.l2TokenBridge ?? "", L2_STANDARD_BRIDGE)) p.push("L2_TOKEN is not minted by the L2 standard bridge");
+  if (o.l1TokenDecimals !== DECIMALS || o.l2TokenDecimals !== DECIMALS) p.push(`${TOKEN} must have 18 decimals on both chains`);
   return p;
 }
 
@@ -429,12 +443,12 @@ export function shortHex(h: string): string {
   return h.length > 14 ? `${h.slice(0, 6)}…${h.slice(-4)}` : h;
 }
 
-/** EIP-3085 parameters for LONGYU testnet. */
+/** EIP-3085 parameters for LONGYU. */
 export function longyuChainParams(cfg: Pick<BridgeConfig, "l2RpcUrl" | "explorerUrl">) {
   return {
     chainId: `0x${L2_CHAIN_ID.toString(16)}`,
-    chainName: "LONGYU Testnet",
-    nativeCurrency: { name: "BNB", symbol: "tBNB", decimals: DECIMALS },
+    chainName: PROFILE.l2.name,
+    nativeCurrency: { name: "BNB", symbol: NATIVE, decimals: DECIMALS },
     rpcUrls: [cfg.l2RpcUrl],
     ...(cfg.explorerUrl ? { blockExplorerUrls: [cfg.explorerUrl] } : {}),
   };

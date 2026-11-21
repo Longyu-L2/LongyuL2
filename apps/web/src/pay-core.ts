@@ -1,4 +1,5 @@
 /** Pure helpers for the pay page, kept apart from the DOM so they can be tested. */
+import { PROFILE } from "./profile.ts";
 
 export interface OrderView {
   orderId: string;
@@ -26,6 +27,7 @@ export function parseOrderId(search: string): string | null {
   return id && /^0x[0-9a-fA-F]{64}$/.test(id) ? id.toLowerCase() : null;
 }
 
+/** BscScan for the build's BNB Smart Chain; BscScan on BNB Smart Chain for any other payment chain. */
 export function explorerTxUrl(chainId: number, hash: string): string {
-  return `${chainId === 97 ? "https://testnet.bscscan.com" : "https://bscscan.com"}/tx/${hash}`;
+  return `${chainId === PROFILE.l1.id ? PROFILE.l1.explorer : "https://bscscan.com"}/tx/${hash}`;
 }

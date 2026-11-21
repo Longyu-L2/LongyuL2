@@ -26,6 +26,7 @@ import {
 } from "viem";
 import { emissionScheduleAbi, faucetAbi, longTokenAbi, migrationDistributorAbi, miningDistributorAbi, miningVaultAbi, paymentRouterAbi } from "@longyu/abis";
 import { DECIMALS, DEFAULT_L1_RPC, L1_CHAIN_ID, L2_CHAIN_ID, errorMessage, formatAmount, parseAddress, parseUrl } from "./bridge-core.ts";
+import { PROFILE } from "./profile.ts";
 
 export const SAFE_VERSION = "1.3.0";
 /** Where a Safe keeps its guard: keccak256("guard_manager.guard.address"). */
@@ -87,7 +88,7 @@ export function parseSafeConfig(raw: RawSafeConfig | null | undefined): SafeConf
 // ------------------------------------------------------------------ the transaction and its link
 
 export type SafeChainId = typeof L1_CHAIN_ID | typeof L2_CHAIN_ID;
-export const CHAIN_NAMES: Record<SafeChainId, string> = { [L1_CHAIN_ID]: "BSC Testnet", [L2_CHAIN_ID]: "LONGYU Testnet" };
+export const CHAIN_NAMES: Record<SafeChainId, string> = { [L1_CHAIN_ID]: PROFILE.l1.name, [L2_CHAIN_ID]: PROFILE.l2.name };
 
 /** The four fields of a Safe transaction that this page sets; the others are always zero. */
 export interface SafeTx {
@@ -279,7 +280,10 @@ function catalogue(abis: readonly Abi[]): KnownCall[] {
   return [...bySelector.values()].filter((c): c is KnownCall => c !== null).sort((x, y) => (x.signature.toLowerCase() < y.signature.toLowerCase() ? -1 : 1));
 }
 
-export const CALLS: readonly KnownCall[] = catalogue([adminAbi, longTokenAbi, miningVaultAbi, miningDistributorAbi, faucetAbi, migrationDistributorAbi, paymentRouterAbi, emissionScheduleAbi] as readonly Abi[]);
+declare const __NETWORK__: string;
+// Only the testnet has a faucet. In a build the test is a constant, so a mainnet build leaves its calls out.
+const faucetAbis = typeof __NETWORK__ === "undefined" || __NETWORK__ === "testnet" ? [faucetAbi] : [];
+export const CALLS: readonly KnownCall[] = catalogue([adminAbi, longTokenAbi, miningVaultAbi, miningDistributorAbi, ...faucetAbis, migrationDistributorAbi, paymentRouterAbi, emissionScheduleAbi] as readonly Abi[]);
 const CALL_BY_SELECTOR = new Map(CALLS.map((c) => [c.selector, c]));
 
 export interface DecodedCall {
@@ -305,7 +309,7 @@ export function decodeCall(input: Hex): DecodedCall | null {
   }
 }
 
-/** A decoded value as text. Large whole numbers also show as a multiple of 10^18, the unit of BNB and tLONG. */
+/** A decoded value as text. Large whole numbers also show as a multiple of 10^18, the unit of BNB and LONG. */
 export function formatValue(value: unknown): string {
   if (typeof value === "bigint") return value >= 10n ** 15n ? `${value} (${formatAmount(value)} × 10^${DECIMALS})` : value.toString();
   if (typeof value === "string") return value;

@@ -54,4 +54,6 @@ APP_VARIANT=testnet EXPO_PUBLIC_API_URL=https://... EXPO_PUBLIC_TURNSTILE_SITE_K
 EXPO_PUBLIC_API_URL=https://... node site/server.mjs      # http://localhost:8080
 ```
 
+`APP_VARIANT=production` (with `EXPO_PUBLIC_API_URL=https://api.longyu.network`) makes the mainnet app: no testnet label, text or addresses, and the chain check of `chain-check.production.json`. Run the server with the same `APP_VARIANT`. The image takes it as `--build-arg APP_VARIANT=production`.
+
 Files ending in `.web.ts` or `.web.tsx` are the browser's versions of the ones beside them; the APK never contains them.

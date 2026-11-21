@@ -1,6 +1,7 @@
 // Serves LONGYU MINE's web build and the Android app's download, and nothing else. Usage: node server.mjs
 //   PORT                  default 8080
 //   EXPO_PUBLIC_API_URL   the API the build was made for: the one other address the page may call
+//   LONGYU_CHAIN_CHECK    the build's chain-check file (set in the image); else APP_VARIANT picks one
 //   ORIGIN_SECRET         set only behind Cloudflare, which adds it to every request (the
 //                         x-longyu-origin header): requests without it are refused, except /health
 // The build (dist/) and the download (downloads/*.apk, at most one) are read once at start, so a
@@ -39,10 +40,12 @@ const APK_TYPE = "application/vnd.android.package-archive";
  */
 /**
  * The two addresses the app's chain check reads (src/lib/chain-work.ts): LONGYU's RPC and a BSC RPC.
- * The defaults are in chain-check.json, next to app.config.ts in the repository and at / in the image.
+ * The defaults are in chain-check.<testnet|production>.json, next to app.config.ts, picked by APP_VARIANT
+ * as the app picks them. The image holds only its build's file, at LONGYU_CHAIN_CHECK.
  */
 export function chainCheckOrigins(env = process.env) {
-  const defaults = JSON.parse(readFileSync(new URL("../chain-check.json", import.meta.url), "utf8"));
+  const file = env.LONGYU_CHAIN_CHECK || new URL(`../chain-check.${env.APP_VARIANT === "production" ? "production" : "testnet"}.json`, import.meta.url);
+  const defaults = JSON.parse(readFileSync(file, "utf8"));
   return [env.EXPO_PUBLIC_L2_RPC_URL || defaults.l2RpcUrl, env.EXPO_PUBLIC_L1_RPC_URL || defaults.l1RpcUrl].map((raw) => {
     const url = new URL(raw);
     if (url.protocol !== "https:") throw new Error("the chain check's RPC addresses must be https");

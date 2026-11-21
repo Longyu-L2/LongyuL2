@@ -63,8 +63,8 @@
       <section class="card" id="safe-card">
         <div class="muted" id="closed" hidden></div>
         <div class="seg" role="group" aria-label="Chain" id="chain">
-          <button type="button" data-chain="97" aria-pressed="false">BSC Testnet</button>
-          <button type="button" data-chain="668801" aria-pressed="true">LONGYU</button>
+          <button type="button" data-chain="{{L1_CHAIN_ID}}" aria-pressed="false">{{L1_NAME}}</button>
+          <button type="button" data-chain="{{L2_CHAIN_ID}}" aria-pressed="true">LONGYU</button>
         </div>
         <div class="box">
           <label for="safe">Safe</label>
@@ -87,7 +87,7 @@
           <input id="to" class="mono" type="text" autocomplete="off" spellcheck="false" placeholder="0x…" maxlength="42" />
         </div>
         <div class="box">
-          <label for="value">Amount, tBNB</label>
+          <label for="value">Amount, {{NATIVE}}</label>
           <input id="value" class="num" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0" maxlength="80" />
         </div>
         <div class="box">

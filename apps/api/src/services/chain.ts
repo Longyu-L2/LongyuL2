@@ -193,6 +193,13 @@ const erc20BalanceAbi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256" }] },
 ] as const;
 
+/** LongMiningToken (mainnet): the vault creates rewards up to the mining pool instead of holding them. */
+const mintedRewardAbi = [
+  { type: "function", name: "miningMinter", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
+  { type: "function", name: "miningCap", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "mined", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
+] as const;
+
 const transferEventAbi = [
   {
     type: "event", name: "Transfer", anonymous: false,
@@ -438,10 +445,23 @@ export function createViemChain(o: ViemChainOptions): ChainGateway {
           ? pub.getBalance({ address: holder })
           : pub.readContract({ address: token, abi: erc20BalanceAbi, functionName: "balanceOf", args: [holder] });
       const native = (a?: Address) => (a ? pub.getBalance({ address: a }) : Promise.resolve(null));
+      // What the vault can still pay: what it holds, plus, when it creates the reward token itself
+      // (mainnet's LongMiningToken), what is left of the mining pool to create.
+      const fundable = async (token: Address, v: Address) => {
+        const held = await holding(token, v);
+        if (token === ZERO) return held;
+        const minter = await pub.readContract({ address: token, abi: mintedRewardAbi, functionName: "miningMinter" }).catch(() => null);
+        if (!minter || !isAddressEqual(minter, v)) return held;
+        const [cap, mined] = await Promise.all([
+          pub.readContract({ address: token, abi: mintedRewardAbi, functionName: "miningCap" }),
+          pub.readContract({ address: token, abi: mintedRewardAbi, functionName: "mined" }),
+        ]);
+        return held + (cap - mined);
+      };
       const [publisherBalance, relayerBalance, vaultBalance, faucetBalance] = await Promise.all([
         native(o.publisher?.address),
         native(o.relayer?.address),
-        vault === ZERO ? Promise.resolve(null) : holding(asset, vault),
+        vault === ZERO ? Promise.resolve(null) : fundable(asset, vault),
         o.faucet
           ? pub.readContract({ address: o.faucet, abi: faucetAbi, functionName: "asset" }).then((a) => holding(a, o.faucet!))
           : Promise.resolve(null),

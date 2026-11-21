@@ -1,0 +1,5 @@
+{
+  "l2RpcUrl": "https://rpc.longyu.network",
+  "l1RpcUrl": "https://bsc-rpc.publicnode.com",
+  "outputOracle": "0x77fF9CDD8B92869D428956695dE0e2d94a75aDC8"
+}

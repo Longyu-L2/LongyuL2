@@ -1,18 +1,19 @@
 /**
- * Bridge page: moves tBNB and tLONG between BNB Smart Chain testnet and LONGYU with the visitor's own
- * wallet, and takes withdrawals through prove and finalize on BSC. Nothing here holds a key.
+ * Bridge page: moves BNB and the mined token between BNB Smart Chain and LONGYU with the visitor's own
+ * wallet, and takes withdrawals through prove and finalize on BSC. Nothing here holds a key. Where the
+ * mined token does not move yet (mainnet until the TGE: PROFILE.bridgeToken), it moves BNB only.
  *
  * Deposits (BSC -> LONGYU)
- * - tBNB: OptimismPortal.depositTransaction, built by viem's buildDepositTransaction on the LONGYU
+ * - BNB: OptimismPortal.depositTransaction, built by viem's buildDepositTransaction on the LONGYU
  *   client and sent by depositTransaction on the BSC wallet. This is viem's documented path for the
  *   native asset. It is one contract call (L1StandardBridge.depositETHTo would add the messenger hop
  *   and its gas), and with the recipient equal to the sender the BNB lands on the same address even
  *   if the L2 call failed, because a deposit's mint is credited to the sender before the call runs.
- * - tLONG: approve exactly the amount to the L1StandardBridge, then
+ * - LONG: approve exactly the amount to the L1StandardBridge, then
  *   depositERC20To(L1_TOKEN, L2_TOKEN, sender, amount, 200000, "0x").
  *
  * Withdrawals (LONGYU -> BSC)
- * - Both assets: L2StandardBridge.withdrawTo(token, sender, amount, 200000, "0x"). For tBNB the token
+ * - Both assets: L2StandardBridge.withdrawTo(token, sender, amount, 200000, "0x"). For BNB the token
  *   is the legacy ETH address 0xDeadDeAddeAddEAddeadDEaDDEAdDeaDDeAD0000 and the amount is sent as
  *   value: in opbnb v0.5.6 L2StandardBridge 1.10.0, _initiateWithdrawal routes that address to
  *   _initiateBridgeETH, which requires msg.value == amount (and reverts on a custom gas token chain,
@@ -43,7 +44,6 @@ import {
   type Hex,
   type TransactionReceipt,
 } from "viem";
-import { bscTestnet } from "viem/chains";
 import {
   chainConfig,
   getL2TransactionHashes,
@@ -57,6 +57,8 @@ import {
   L1_CHAIN_ID,
   L1_EXPLORER,
   L2_CHAIN_ID,
+  NATIVE,
+  TOKEN,
   L2_CROSS_DOMAIN_MESSENGER,
   L2_STANDARD_BRIDGE,
   L2_TO_L1_MESSAGE_PASSER,
@@ -95,6 +97,7 @@ import {
   type RawConfig,
   type StatusView,
 } from "./bridge-core.ts";
+import { L1_CHAIN, PROFILE } from "./profile.ts";
 
 declare const __BRIDGE_CONFIG__: RawConfig;
 declare global {
@@ -114,7 +117,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className = "", text 
 };
 
 type Direction = "deposit" | "withdraw";
-type Asset = "tBNB" | "tLONG";
+/** NATIVE or TOKEN. */
+type Asset = string;
 type Note = (s: string) => void;
 interface Link {
   href: string | null;
@@ -158,27 +162,27 @@ function start(cfg: BridgeConfig): void {
   const longyu = defineChain({
     ...chainConfig,
     id: L2_CHAIN_ID,
-    name: "LONGYU Testnet",
-    nativeCurrency: { name: "BNB", symbol: "tBNB", decimals: 18 },
+    name: PROFILE.l2.name,
+    nativeCurrency: { name: "BNB", symbol: NATIVE, decimals: 18 },
     rpcUrls: { default: { http: [cfg.l2RpcUrl] } },
     ...(cfg.explorerUrl ? { blockExplorers: { default: { name: "LONGYU Explorer", url: cfg.explorerUrl } } } : {}),
     blockTime: 250,
     contracts: {
       ...chainConfig.contracts,
-      portal: { 97: { address: cfg.l1Portal } },
-      l2OutputOracle: { 97: { address: cfg.l1OutputOracle } },
-      l1StandardBridge: { 97: { address: cfg.l1StandardBridge } },
+      portal: { [L1_CHAIN_ID]: { address: cfg.l1Portal } },
+      l2OutputOracle: { [L1_CHAIN_ID]: { address: cfg.l1OutputOracle } },
+      l1StandardBridge: { [L1_CHAIN_ID]: { address: cfg.l1StandardBridge } },
     },
-    sourceId: 97,
-    testnet: true,
+    sourceId: L1_CHAIN_ID,
+    ...PROFILE.l2.chain,
   });
   // Reads go to the configured RPCs, never through the wallet, so they do not depend on its network.
-  const l1 = createPublicClient({ chain: bscTestnet, transport: http(cfg.l1RpcUrl) }).extend(publicActionsL1());
+  const l1 = createPublicClient({ chain: L1_CHAIN, transport: http(cfg.l1RpcUrl) }).extend(publicActionsL1());
   const l2 = createPublicClient({ chain: longyu, transport: http(cfg.l2RpcUrl) }).extend(publicActionsL2());
   const bscParams = {
     chainId: toHex(L1_CHAIN_ID),
-    chainName: bscTestnet.name,
-    nativeCurrency: bscTestnet.nativeCurrency,
+    chainName: L1_CHAIN.name,
+    nativeCurrency: L1_CHAIN.nativeCurrency,
     rpcUrls: [cfg.l1RpcUrl],
     blockExplorerUrls: [L1_EXPLORER],
   };
@@ -188,10 +192,10 @@ function start(cfg: BridgeConfig): void {
   const sendButton = $("send") as HTMLButtonElement;
 
   let dir: Direction = "deposit";
-  let asset: Asset = "tBNB";
+  let asset: Asset = NATIVE;
   let account: Address | null = null;
   let balance: bigint | null = null;
-  /** What a share of the balance leaves behind for gas; nothing for tLONG. */
+  /** What a share of the balance leaves behind for gas; nothing for the mined token. */
   let reserve = 0n;
   let busy = false;
   let paused = false;
@@ -200,6 +204,12 @@ function start(cfg: BridgeConfig): void {
   const entries = new Map<Hex, Entry[]>();
   const done = new Set<string>();
   const receipts = new Map<Hex, TransactionReceipt>();
+  /** The mined token's two addresses; only a network where it moves has them. */
+  const tokens = () => {
+    const { l1Token, l2Token } = cfg;
+    if (!l1Token || !l2Token) throw new Error(`${TOKEN} moves after the TGE.`);
+    return { l1Token, l2Token };
+  };
 
   // ---------------------------------------------------------------- storage (best effort)
 
@@ -248,28 +258,32 @@ function start(cfg: BridgeConfig): void {
     ]);
     let observed;
     try {
-      const [portalVersion, portalOracle, bridgeMessenger, period, interval, blockTimeMs, l1TokenDecimals, l2OtherBridge, l2OtherMessenger, l2TokenRemote, l2TokenBridge, l2TokenDecimals] =
-        await Promise.all([
+      const { l1Token, l2Token } = cfg;
+      const [[portalVersion, portalOracle, bridgeMessenger, period, interval, blockTimeMs, l2OtherBridge, l2OtherMessenger], token] = await Promise.all([
+        Promise.all([
           l1.readContract({ address: cfg.l1Portal, abi: portalAbi, functionName: "version" }),
           l1.readContract({ address: cfg.l1Portal, abi: portalAbi, functionName: "l2Oracle" }),
           l1.readContract({ address: cfg.l1StandardBridge, abi: l1BridgeAbi, functionName: "messenger" }),
           l1.readContract({ address: cfg.l1OutputOracle, abi: outputOracleAbi, functionName: "FINALIZATION_PERIOD_SECONDS" }),
           l1.readContract({ address: cfg.l1OutputOracle, abi: outputOracleAbi, functionName: "SUBMISSION_INTERVAL" }),
           l1.readContract({ address: cfg.l1OutputOracle, abi: outputOracleAbi, functionName: "L2_FOURIER_MILLISECONDS_BLOCK_TIME" }),
-          l1.readContract({ address: cfg.l1Token, abi: erc20Abi, functionName: "decimals" }),
           l2.readContract({ address: L2_STANDARD_BRIDGE, abi: l2BridgeAbi, functionName: "otherBridge" }),
           l2.readContract({ address: L2_CROSS_DOMAIN_MESSENGER, abi: messengerAbi, functionName: "otherMessenger" }),
-          l2.readContract({ address: cfg.l2Token, abi: mintableAbi, functionName: "remoteToken" }),
-          l2.readContract({ address: cfg.l2Token, abi: mintableAbi, functionName: "bridge" }),
-          l2.readContract({ address: cfg.l2Token, abi: mintableAbi, functionName: "decimals" }),
-        ]);
+        ]),
+        // The mined token's side, where it moves.
+        l1Token && l2Token
+          ? Promise.all([
+              l1.readContract({ address: l1Token, abi: erc20Abi, functionName: "decimals" }),
+              l2.readContract({ address: l2Token, abi: mintableAbi, functionName: "remoteToken" }),
+              l2.readContract({ address: l2Token, abi: mintableAbi, functionName: "bridge" }),
+              l2.readContract({ address: l2Token, abi: mintableAbi, functionName: "decimals" }),
+            ]).then(([l1TokenDecimals, l2TokenRemote, l2TokenBridge, l2TokenDecimals]) => ({ l1TokenDecimals, l2TokenRemote, l2TokenBridge, l2TokenDecimals }))
+          : {},
+      ]);
       const messengerPortal = await l1.readContract({ address: bridgeMessenger, abi: messengerAbi, functionName: "portal" });
       observed = {
         value: { messenger: bridgeMessenger, period, interval: (interval * blockTimeMs) / 1000n + BigInt(PROPOSER_DELAY_SECONDS), submissionInterval: interval, blockTimeMs },
-        problems: wiringProblems(
-          { l1ChainId, l2ChainId, portalVersion, portalOracle, bridgeMessenger, messengerPortal, l2OtherBridge, l2OtherMessenger, l2TokenRemote, l2TokenBridge, l1TokenDecimals, l2TokenDecimals },
-          cfg,
-        ),
+        problems: wiringProblems({ l1ChainId, l2ChainId, portalVersion, portalOracle, bridgeMessenger, messengerPortal, l2OtherBridge, l2OtherMessenger, ...token }, cfg),
       };
     } catch (e) {
       console.warn("Bridge wiring check failed:", e);
@@ -311,11 +325,11 @@ function start(cfg: BridgeConfig): void {
     return next;
   }
 
-  /** Puts the wallet on the chain the next transaction is for, adding LONGYU (or BSC testnet) when the wallet lacks it. */
+  /** Puts the wallet on the chain the next transaction is for, adding LONGYU (or BSC) when the wallet lacks it. */
   async function ensureChain(target: "l1" | "l2", note: Note): Promise<void> {
     const eth = provider();
     const id = target === "l1" ? L1_CHAIN_ID : L2_CHAIN_ID;
-    const name = target === "l1" ? "BSC Testnet" : "LONGYU Testnet";
+    const name = target === "l1" ? PROFILE.l1.name : PROFILE.l2.name;
     const current = async () => Number(await eth.request({ method: "eth_chainId" }));
     if ((await current()) === id) return;
     note(`Switch your wallet to ${name}`);
@@ -330,7 +344,7 @@ function start(cfg: BridgeConfig): void {
     if ((await current()) !== id) throw new Error(`Switch your wallet to ${name}.`);
   }
 
-  const l1Wallet = () => createWalletClient({ chain: bscTestnet, transport: custom(provider()) }).extend(walletActionsL1());
+  const l1Wallet = () => createWalletClient({ chain: L1_CHAIN, transport: custom(provider()) }).extend(walletActionsL1());
   const l2Wallet = () => createWalletClient({ chain: longyu, transport: custom(provider()) });
 
   const l1Fee = async (gas: bigint) => gas * (await l1.getGasPrice());
@@ -352,12 +366,12 @@ function start(cfg: BridgeConfig): void {
   // ---------------------------------------------------------------- deposits
 
   async function depositBnb(amount: bigint, from: Address): Promise<void> {
-    const shown = `${formatAmount(amount)} tBNB`;
+    const shown = `${formatAmount(amount)} ${NATIVE}`;
     const held = await l1.getBalance({ address: from });
-    if (held < amount) throw new Error(`Not enough tBNB on BSC: ${formatAmount(held)}.`);
+    if (held < amount) throw new Error(`Not enough ${NATIVE} on BSC: ${formatAmount(held)}.`);
     const args = await l2.buildDepositTransaction({ account: from, mint: amount, to: from });
     const fee = await l1Fee(await l1.estimateDepositTransactionGas({ account: from, request: args.request, targetChain: longyu }));
-    if (held < amount + fee) throw new Error(`Not enough tBNB on BSC for ${shown} plus gas.`);
+    if (held < amount + fee) throw new Error(`Not enough ${NATIVE} on BSC for ${shown} plus gas.`);
     await ensureChain("l1", setStatus);
     setStatus(`Confirm ${shown} in your wallet`);
     const hash = await l1Wallet().depositTransaction(args);
@@ -365,15 +379,16 @@ function start(cfg: BridgeConfig): void {
   }
 
   async function depositLong(amount: bigint, from: Address): Promise<void> {
-    const shown = `${formatAmount(amount)} tLONG`;
-    const tokenBalance = () => l1.readContract({ address: cfg.l1Token, abi: erc20Abi, functionName: "balanceOf", args: [from] });
-    const allowance = () => l1.readContract({ address: cfg.l1Token, abi: erc20Abi, functionName: "allowance", args: [from, cfg.l1StandardBridge] });
+    const shown = `${formatAmount(amount)} ${TOKEN}`;
+    const { l1Token, l2Token } = tokens();
+    const tokenBalance = () => l1.readContract({ address: l1Token, abi: erc20Abi, functionName: "balanceOf", args: [from] });
+    const allowance = () => l1.readContract({ address: l1Token, abi: erc20Abi, functionName: "allowance", args: [from, cfg.l1StandardBridge] });
     const held = await tokenBalance();
-    if (held < amount) throw new Error(`Not enough tLONG on BSC: ${formatAmount(held)}.`);
+    if (held < amount) throw new Error(`Not enough ${TOKEN} on BSC: ${formatAmount(held)}.`);
     const gasMoney = await l1.getBalance({ address: from });
     if ((await allowance()) < amount) {
-      const approve = { account: from, address: cfg.l1Token, abi: erc20Abi, functionName: "approve", args: [cfg.l1StandardBridge, amount] } as const;
-      if (gasMoney < (await l1Fee(await l1.estimateContractGas(approve)))) throw new Error("Not enough tBNB on BSC for gas.");
+      const approve = { account: from, address: l1Token, abi: erc20Abi, functionName: "approve", args: [cfg.l1StandardBridge, amount] } as const;
+      if (gasMoney < (await l1Fee(await l1.estimateContractGas(approve)))) throw new Error(`Not enough ${NATIVE} on BSC for gas.`);
       await ensureChain("l1", setStatus);
       setStatus(`1/2 · Approve ${shown} in your wallet`);
       const hash = await l1Wallet().writeContract(approve);
@@ -391,9 +406,9 @@ function start(cfg: BridgeConfig): void {
       address: cfg.l1StandardBridge,
       abi: l1BridgeAbi,
       functionName: "depositERC20To",
-      args: [cfg.l1Token, cfg.l2Token, from, amount, MIN_GAS_LIMIT, "0x"],
+      args: [l1Token, l2Token, from, amount, MIN_GAS_LIMIT, "0x"],
     } as const;
-    if ((await l1.getBalance({ address: from })) < (await l1Fee(await l1.estimateContractGas(deposit)))) throw new Error("Not enough tBNB on BSC for gas.");
+    if ((await l1.getBalance({ address: from })) < (await l1Fee(await l1.estimateContractGas(deposit)))) throw new Error(`Not enough ${NATIVE} on BSC for gas.`);
     await ensureChain("l1", setStatus);
     setStatus(`2/2 · Confirm the deposit of ${shown}`);
     const hash = await l1Wallet().writeContract(deposit);
@@ -432,17 +447,17 @@ function start(cfg: BridgeConfig): void {
   async function withdraw(kind: Asset, amount: bigint, from: Address, w: Wiring): Promise<void> {
     const shown = `${formatAmount(amount)} ${kind}`;
     const native = await l2.getBalance({ address: from });
-    if (kind === "tBNB" && native < amount) throw new Error(`Not enough tBNB on LONGYU: ${formatAmount(native)}.`);
-    if (kind === "tLONG") {
-      const held = await l2.readContract({ address: cfg.l2Token, abi: erc20Abi, functionName: "balanceOf", args: [from] });
-      if (held < amount) throw new Error(`Not enough tLONG on LONGYU: ${formatAmount(held)}.`);
+    if (kind === NATIVE && native < amount) throw new Error(`Not enough ${NATIVE} on LONGYU: ${formatAmount(native)}.`);
+    if (kind === TOKEN) {
+      const held = await l2.readContract({ address: tokens().l2Token, abi: erc20Abi, functionName: "balanceOf", args: [from] });
+      if (held < amount) throw new Error(`Not enough ${TOKEN} on LONGYU: ${formatAmount(held)}.`);
     }
-    const value = kind === "tBNB" ? amount : 0n;
-    const args = [kind === "tBNB" ? LEGACY_ERC20_ETH : cfg.l2Token, from, amount, MIN_GAS_LIMIT, "0x"] as const;
+    const value = kind === NATIVE ? amount : 0n;
+    const args = [kind === NATIVE ? LEGACY_ERC20_ETH : tokens().l2Token, from, amount, MIN_GAS_LIMIT, "0x"] as const;
     const call = { account: from, address: L2_STANDARD_BRIDGE, abi: l2BridgeAbi, functionName: "withdrawTo", args, value } as const;
     const gas = await l2.estimateContractGas(call);
     const fee = await l2Fee(gas, { account: from, to: L2_STANDARD_BRIDGE, data: encodeFunctionData({ abi: l2BridgeAbi, functionName: "withdrawTo", args }), value });
-    if (native < value + fee) throw new Error(kind === "tBNB" ? `Not enough tBNB on LONGYU for ${shown} plus gas.` : "Not enough tBNB on LONGYU for gas.");
+    if (native < value + fee) throw new Error(kind === NATIVE ? `Not enough ${NATIVE} on LONGYU for ${shown} plus gas.` : `Not enough ${NATIVE} on LONGYU for gas.`);
     await ensureChain("l2", setStatus);
     setStatus(`Confirm the withdrawal of ${shown}`);
     const hash = await l2Wallet().writeContract(call);
@@ -498,7 +513,7 @@ function start(cfg: BridgeConfig): void {
     note("Building the proof…");
     const args = await buildProof(receipt, withdrawal, from);
     const fee = await l1Fee(await l1.estimateProveWithdrawalGas(args));
-    if ((await l1.getBalance({ address: from })) < fee) throw new Error("Not enough tBNB on BSC for gas.");
+    if ((await l1.getBalance({ address: from })) < fee) throw new Error(`Not enough ${NATIVE} on BSC for gas.`);
     await ensureChain("l1", note);
     note("Confirm the proof in your wallet");
     const tx = await l1Wallet().proveWithdrawal(args);
@@ -518,7 +533,7 @@ function start(cfg: BridgeConfig): void {
     if (status !== "ready-to-finalize") throw new Error(`${statusView(status).label}.`);
     const request = { account: from, targetChain: longyu, withdrawal };
     const fee = await l1Fee(await l1.estimateFinalizeWithdrawalGas(request));
-    if ((await l1.getBalance({ address: from })) < fee) throw new Error("Not enough tBNB on BSC for gas.");
+    if ((await l1.getBalance({ address: from })) < fee) throw new Error(`Not enough ${NATIVE} on BSC for gas.`);
     await ensureChain("l1", note);
     note("Confirm the finalization in your wallet");
     const tx = await l1Wallet().finalizeWithdrawal(request);
@@ -685,16 +700,16 @@ function start(cfg: BridgeConfig): void {
     try {
       const value =
         dir === "deposit"
-          ? asset === "tBNB"
+          ? asset === NATIVE
             ? await l1.getBalance({ address: who })
-            : await l1.readContract({ address: cfg.l1Token, abi: erc20Abi, functionName: "balanceOf", args: [who] })
-          : asset === "tBNB"
+            : await l1.readContract({ address: tokens().l1Token, abi: erc20Abi, functionName: "balanceOf", args: [who] })
+          : asset === NATIVE
             ? await l2.getBalance({ address: who })
-            : await l2.readContract({ address: cfg.l2Token, abi: erc20Abi, functionName: "balanceOf", args: [who] });
-      const price = asset !== "tBNB" ? 0n : await (dir === "deposit" ? l1.getGasPrice() : l2.getGasPrice()).catch(() => 0n);
+            : await l2.readContract({ address: tokens().l2Token, abi: erc20Abi, functionName: "balanceOf", args: [who] });
+      const price = asset !== NATIVE ? 0n : await (dir === "deposit" ? l1.getGasPrice() : l2.getGasPrice()).catch(() => 0n);
       if (run !== balanceRun) return;
       balance = value;
-      reserve = asset === "tBNB" ? gasReserve(price) : 0n;
+      reserve = asset === NATIVE ? gasReserve(price) : 0n;
       $("balance").textContent = `${formatAmount(value)} ${asset}`;
     } catch {
       if (run === balanceRun) $("balance").textContent = "–";
@@ -704,9 +719,9 @@ function start(cfg: BridgeConfig): void {
   function renderForm(): void {
     $("dir-deposit").setAttribute("aria-pressed", String(dir === "deposit"));
     $("dir-withdraw").setAttribute("aria-pressed", String(dir === "withdraw"));
-    $("asset-bnb").setAttribute("aria-pressed", String(asset === "tBNB"));
-    $("asset-long").setAttribute("aria-pressed", String(asset === "tLONG"));
-    $("route").textContent = dir === "deposit" ? "BSC Testnet → LONGYU" : "LONGYU → BSC Testnet";
+    $("asset-bnb").setAttribute("aria-pressed", String(asset === NATIVE));
+    $("asset-long").setAttribute("aria-pressed", String(asset === TOKEN));
+    $("route").textContent = dir === "deposit" ? `${PROFILE.l1.name} → LONGYU` : `LONGYU → ${PROFILE.l1.name}`;
     $("eta").textContent = dir === "deposit" ? "≈ 1 min" : wiring ? `≈ ${formatDuration(Number(wiring.interval + wiring.period))}` : "–";
     show("quick", account !== null);
     show("connect", account === null);
@@ -718,6 +733,8 @@ function start(cfg: BridgeConfig): void {
     const verb = dir === "deposit" ? "Deposit" : "Withdraw";
     sendButton.textContent = amount ? `${verb} ${formatAmount(amount)} ${asset}` : verb;
     document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("#bridge button, #bridge input, #history button").forEach((node) => (node.disabled = busy));
+    // Where the mined token does not move yet, its choice stays off.
+    if (!cfg.l1Token || !cfg.l2Token) ($("asset-long") as HTMLButtonElement).disabled = true;
   }
 
   function setBusy(on: boolean): void {
@@ -756,8 +773,8 @@ function start(cfg: BridgeConfig): void {
 
   $("dir-deposit").onclick = () => choose({ dir: "deposit" });
   $("dir-withdraw").onclick = () => choose({ dir: "withdraw" });
-  $("asset-bnb").onclick = () => choose({ asset: "tBNB" });
-  $("asset-long").onclick = () => choose({ asset: "tLONG" });
+  $("asset-bnb").onclick = () => choose({ asset: NATIVE });
+  $("asset-long").onclick = () => choose({ asset: TOKEN });
   amountInput.oninput = renderForm;
   document.querySelectorAll<HTMLButtonElement>("#quick button").forEach((node) => {
     node.onclick = () => {
@@ -765,7 +782,7 @@ function start(cfg: BridgeConfig): void {
       const amount = shareAmount(balance, Number(node.dataset.share), reserve);
       amountInput.value = amount > 0n ? formatAmount(amount) : "";
       setStatus("");
-      $("error").textContent = amount > 0n ? "" : balance > 0n ? "Not enough tBNB to leave for gas." : `No ${asset} here yet.`;
+      $("error").textContent = amount > 0n ? "" : balance > 0n ? `Not enough ${NATIVE} to leave for gas.` : `No ${asset} here yet.`;
       renderForm();
     };
   });
@@ -781,7 +798,7 @@ function start(cfg: BridgeConfig): void {
       const from = await connect();
       const w = await checkWiring();
       if (d === "withdraw") await withdraw(a, amount, from, w);
-      else if (a === "tBNB") await depositBnb(amount, from);
+      else if (a === NATIVE) await depositBnb(amount, from);
       else await depositLong(amount, from);
     });
   $("add").onclick = () => {

@@ -7,7 +7,9 @@ import { useApp } from "@/lib/app-state";
 import { useLiveBalances, useUnlock } from "@/lib/resources";
 import { shares } from "@/lib/rewards";
 import { fill, formatTokenFixed } from "@/lib/format";
+import { MAINNET } from "@/lib/variant";
 import { colors, space, tabular } from "@/design/tokens";
+import { Icon } from "./Icon";
 import { Figure, Skeleton, T } from "./ui";
 
 export type RewardPart = "earned" | "claimable" | "pending" | "claimed";
@@ -73,4 +75,16 @@ export function UnlockNote({ center = true }: { center?: boolean }) {
       })
     : t("pendingHint");
   return <T variant="small" color={colors.textSoft} center={center}>{line}</T>;
+}
+
+/** Mainnet only: mined LONG stays in the miner's wallet, and cannot be moved, until the TGE. */
+export function TgeLock() {
+  const { t } = useApp();
+  if (!MAINNET) return null;
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: space.xs }}>
+      <Icon name="lock" size={13} color={colors.textFaint} />
+      <T variant="small" color={colors.textFaint}>{t("lockedUntilTge")}</T>
+    </View>
+  );
 }

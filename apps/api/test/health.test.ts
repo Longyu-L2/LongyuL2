@@ -362,3 +362,17 @@ test("health: the batcher's and the proposer's gas on the L1", async () => {
   assert.throws(() => loadConfig({ ...base, L1_RPC_URL: "https://l1.example", L1_WATCH: "batcher" }), /L1_WATCH/);
   assert.equal(loadConfig({ ...base, L1_RPC_URL: "https://l1.example", L1_WATCH: `batcher:${BATCHER}` }).L1_MIN_GAS_BALANCE, "0.01");
 });
+
+test("health: before mining day 0 the vault runway says when mining starts, not a failure", async () => {
+  const env = await makeEnv();
+  try {
+    await allJobsSucceeded(env);
+    env.clock.t = env.deps.schedule.startTime - 3600n;
+    const h = await health(env);
+    assert.equal(h.by["vault runway"]?.status, "ok", JSON.stringify(h.by["vault runway"]));
+    assert.match(h.by["vault runway"]!.detail, /^mining starts \d{4}-\d{2}-\d{2}$/);
+    assert.notEqual(h.by.chain?.status, "critical");
+  } finally {
+    await env.close();
+  }
+});

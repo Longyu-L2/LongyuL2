@@ -1,12 +1,18 @@
 /**
  * UI strings. Every key must exist in every language; i18n.test.ts enforces it. "{name}"-style
  * placeholders are filled with fill() from format.ts. Chinese text uses full-width punctuation.
+ *
+ * A few strings belong to one network: MAINNET picks them, and a release build keeps only its own
+ * (see variant.ts). A string another network's app never shows is "" there.
  */
+
+const MAINNET = process.env.EXPO_PUBLIC_APP_VARIANT === "production";
 
 export const en = {
   // general
-  testnet: "Testnet",
-  testnetNotice: "Testnet rewards have no monetary value.",
+  networkTag: MAINNET ? "" : "Testnet",
+  rewardValueNotice: MAINNET ? "" : "Testnet rewards have no monetary value.",
+  lockedUntilTge: MAINNET ? "Locked until the TGE" : "",
   back: "Back",
   close: "Close",
   cancel: "Cancel",
@@ -128,7 +134,9 @@ export const en = {
   cost: "Cost",
   allocate: "Activate {plan}",
   estimateNote: "Estimated at today's network size. Final amounts are set at each daily settlement.",
-  capacityDisclosure: "Paid in BNB on BNB Smart Chain from your own wallet. Testnet tLONG has no monetary value.",
+  capacityDisclosure: MAINNET
+    ? "Paid in BNB on BNB Smart Chain from your own wallet. LONG comes only from mining and stays locked until the TGE."
+    : "Paid in BNB on BNB Smart Chain from your own wallet. Testnet tLONG has no monetary value.",
   awaitingPayment: "Awaiting payment",
   pay: "Pay",
   history: "History",
@@ -186,7 +194,7 @@ export const en = {
   // profile
   tabProfile: "Profile",
   verifyIdentity: "Verify identity",
-  verifyBody: "Required before mainnet conversion",
+  verifyBody: MAINNET ? "Required before the TGE" : "Required before mainnet conversion",
   verifyNow: "Verify",
   verifyNotOpen: "Identity checks are not open yet.",
   inviteCode: "Invite code",
@@ -215,8 +223,9 @@ export type StringKey = keyof typeof en;
 
 export const zhHans: Record<StringKey, string> = {
   // general
-  testnet: "测试网",
-  testnetNotice: "测试网奖励没有任何货币价值。",
+  networkTag: MAINNET ? "" : "测试网",
+  rewardValueNotice: MAINNET ? "" : "测试网奖励没有任何货币价值。",
+  lockedUntilTge: MAINNET ? "TGE 前锁定" : "",
   back: "返回",
   close: "关闭",
   cancel: "取消",
@@ -338,7 +347,9 @@ export const zhHans: Record<StringKey, string> = {
   cost: "费用",
   allocate: "启用 {plan}",
   estimateNote: "按当前网络规模估算，最终数额以每日结算为准。",
-  capacityDisclosure: "使用你自己的钱包在 BNB 智能链上以 BNB 付款。测试网 tLONG 没有任何货币价值。",
+  capacityDisclosure: MAINNET
+    ? "使用你自己的钱包在 BNB 智能链上以 BNB 付款。LONG 只能通过挖矿产生，TGE 前锁定。"
+    : "使用你自己的钱包在 BNB 智能链上以 BNB 付款。测试网 tLONG 没有任何货币价值。",
   awaitingPayment: "待付款",
   pay: "付款",
   history: "记录",
@@ -396,7 +407,7 @@ export const zhHans: Record<StringKey, string> = {
   // profile
   tabProfile: "我的",
   verifyIdentity: "身份验证",
-  verifyBody: "主网兑换前需完成",
+  verifyBody: MAINNET ? "TGE 前需完成" : "主网兑换前需完成",
   verifyNow: "验证",
   verifyNotOpen: "身份验证暂未开放。",
   inviteCode: "邀请码",
@@ -423,8 +434,9 @@ export const zhHans: Record<StringKey, string> = {
 
 export const zhHant: Record<StringKey, string> = {
   // general
-  testnet: "測試網",
-  testnetNotice: "測試網獎勵沒有任何貨幣價值。",
+  networkTag: MAINNET ? "" : "測試網",
+  rewardValueNotice: MAINNET ? "" : "測試網獎勵沒有任何貨幣價值。",
+  lockedUntilTge: MAINNET ? "TGE 前鎖定" : "",
   back: "返回",
   close: "關閉",
   cancel: "取消",
@@ -546,7 +558,9 @@ export const zhHant: Record<StringKey, string> = {
   cost: "費用",
   allocate: "啟用 {plan}",
   estimateNote: "按目前網路規模估算，最終數額以每日結算為準。",
-  capacityDisclosure: "使用你自己的錢包在 BNB 智能鏈上以 BNB 付款。測試網 tLONG 沒有任何貨幣價值。",
+  capacityDisclosure: MAINNET
+    ? "使用你自己的錢包在 BNB 智能鏈上以 BNB 付款。LONG 只能透過挖礦產生，TGE 前鎖定。"
+    : "使用你自己的錢包在 BNB 智能鏈上以 BNB 付款。測試網 tLONG 沒有任何貨幣價值。",
   awaitingPayment: "待付款",
   pay: "付款",
   history: "紀錄",
@@ -604,7 +618,7 @@ export const zhHant: Record<StringKey, string> = {
   // profile
   tabProfile: "我的",
   verifyIdentity: "身分驗證",
-  verifyBody: "主網兌換前需完成",
+  verifyBody: MAINNET ? "TGE 前需完成" : "主網兌換前需完成",
   verifyNow: "驗證",
   verifyNotOpen: "身分驗證暫未開放。",
   inviteCode: "邀請碼",

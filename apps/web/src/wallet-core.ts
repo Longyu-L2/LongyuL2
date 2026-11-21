@@ -1,4 +1,5 @@
 /** Pure helpers every page with a wallet shares (tested under Node, in bridge-core.test.ts). */
+import { PROFILE } from "./profile.ts";
 
 export const CANCELLED = "Cancelled in your wallet.";
 
@@ -15,7 +16,7 @@ export function errorMessage(e: unknown): string {
   const err = e as ErrorLike | null;
   const m = String((err && typeof err === "object" && (err.shortMessage || err.message)) || e);
   if (/user rejected|user denied|rejected the request|denied transaction|user cancel/i.test(m)) return CANCELLED;
-  if (/insufficient funds/i.test(m)) return "Not enough tBNB for gas.";
+  if (/insufficient funds/i.test(m)) return `Not enough ${PROFILE.native} for gas.`;
   return m.length > 200 ? `${m.slice(0, 199)}…` : m;
 }
 

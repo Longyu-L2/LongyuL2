@@ -17,6 +17,7 @@ import { Pearl, type PearlState } from "@/components/Pearl";
 import { PulseCheck } from "@/components/PulseCheck";
 import { LiveAmount, LiveFigure, RewardBar, RewardLine } from "@/components/Rewards";
 import { checkChain, solvePuzzle, type RootParts } from "@/lib/chain-work";
+import { MAINNET } from "@/lib/variant";
 
 interface Status {
   day: string;
@@ -359,7 +360,7 @@ export default function MineScreen() {
     <Screen onRefresh={load}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: 44 }}>
         <Brand />
-        <Pill text={t("testnet")} />
+        {MAINNET ? null : <Pill text={t("networkTag")} />}
       </View>
 
       <Columns>

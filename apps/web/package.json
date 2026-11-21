@@ -6,7 +6,7 @@
   "description": "Static web pages: the landing page, claim mining rewards from the contract, pay orders with a wallet, bridge between BSC and LONGYU, swap on LONGYU Swap, and sign as an owner of a Safe multisig",
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --import tsx --test src/chain.test.ts src/pay-core.test.ts src/bridge-core.test.ts src/swap-core.test.ts src/safe-core.test.ts src/landing-core.test.ts server.test.ts",
+    "test": "node --import tsx --test src/chain.test.ts src/pay-core.test.ts src/bridge-core.test.ts src/swap-core.test.ts src/safe-core.test.ts src/landing-core.test.ts src/network.test.ts server.test.ts && node --import tsx --import ./test-mainnet.mjs --test src/mainnet.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

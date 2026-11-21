@@ -42,7 +42,7 @@ Safe v1.3.0, for the admin multisigs. On BSC testnet the scripts use Safe's own 
 
 The withdrawal wait of the output oracle was seven days at launch. On 21 November 2026 it was set to 10 minutes by `contracts/script/SetWithdrawalWait.s.sol`, in BSC testnet transaction `0x6e52c438aecd583f5b7db10e7fa1dc76755f52674c2e921c2b7dda2b0fb91080`; the oracle's implementation is the one in [l1-deployments.json](l1-deployments.json), as before. [deploy-config.json](deploy-config.json) carries the current value.
 
-The first MiningDistributor, `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06`, was replaced on 21 November 2026 by `contracts/script/ReplaceDistributor.s.sol`. It is paused for good. The new one checks the claimed total again when a root activates, and a delay change cannot shorten the wait of a root already posted. It copied every account's claimed amount from the old one on chain, and it posts no root until those amounts add up to the old total. The vault now funds it, and the admin key sent it the 24 tLONG left in the old one.
+The first MiningDistributor, `0x096ca64cB06f555c56F67FD618684D5C2b7F9e06`, was replaced on 21 November 2026 by `contracts/script/ReplaceDistributor.s.sol`. It is paused for good: afterwards the admin key gave up its admin and guardian roles on it, so nobody can unpause it. The new one checks the claimed total again when a root activates, and a delay change cannot shorten the wait of a root already posted. It copied every account's claimed amount from the old one on chain, and it posts no root until those amounts add up to the old total. The vault now funds it, and the admin key sent it the 24 tLONG left in the old one.
 
 LONGYU Scan runs at https://scan-testnet.longyu.network.
 

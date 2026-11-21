@@ -89,7 +89,7 @@ test("accounts lists the addresses and what the policy is bound to", async () =>
 
 test("the watch key signs a veto and a pause, and nothing else", async () => {
   for (const data of [veto, pause]) {
-    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data }) });
+    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data, gas: "100000" }) });
     assert.equal(r.status, 200);
     const { signedTransaction } = (await r.json()) as { signedTransaction: TransactionSerialized };
     assert.equal(await recoverTransactionAddress({ serializedTransaction: signedTransaction }), privateKeyToAddress(key("4")));
@@ -98,6 +98,18 @@ test("the watch key signs a veto and a pause, and nothing else", async () => {
   for (const data of [proposeRoot, unpause]) {
     const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data }) });
     assert.deepEqual([r.status, await r.json()], [403, { error: "call_not_allowed" }]);
+  }
+});
+
+test("the watch has its own caps and no daily allowance to use up", async () => {
+  // Far more requests than the publisher's daily fee allowance would take: every one is still signed.
+  for (let i = 0; i < 25; i++) {
+    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data: pause, gas: "200000", maxFeePerGas: "100000000", maxPriorityFeePerGas: "1000000", nonce: i }) });
+    assert.equal(r.status, 200, `request ${i}`);
+  }
+  for (const [over, error] of [[{ gas: "200001" }, "gas_out_of_range"], [{ gas: "100000", maxFeePerGas: "100000001" }, "fee_too_high"]] as const) {
+    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data: veto, ...over }) });
+    assert.deepEqual([r.status, await r.json()], [403, { error }]);
   }
 });
 

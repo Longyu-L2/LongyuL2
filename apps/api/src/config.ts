@@ -131,7 +131,7 @@ export const ConfigSchema = z.object({
   L1_RPC_URL: z.string().url().optional(),
   L1_WATCH: z.string().max(600).optional(),
   /** L1 balances below this (in the L1's native token) raise a warning; below a fifth of it they are critical. */
-  L1_MIN_GAS_BALANCE: z.string().regex(/^d{1,9}(.d{1,18})?$/).default("0.01"),
+  L1_MIN_GAS_BALANCE: z.string().regex(/^\d{1,9}(\.\d{1,18})?$/).default("0.01"),
   /**
    * Which proxies may set X-Forwarded-For: "false" (none, the default), or comma-separated
    * addresses/CIDRs such as Cloudflare's published ranges. Never "true" on an origin reachable

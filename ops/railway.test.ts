@@ -310,13 +310,13 @@ test("railway: the signer holds the signing keys, and nothing else does", async 
   const signer = svc(nodes, "signer");
   const vars = signer.variables ?? {};
   // The limits keep the defaults in apps/signer/src/config.ts; everything else is declared.
-  const defaults = new Set(["HOST", "MAX_GAS", "MAX_FEE_PER_GAS_WEI", "MAX_DATA_BYTES", "MAX_DAILY_FEE_WEI", "FAUCET_MAX_AMOUNT_WEI", "FAUCET_MAX_DAILY_WEI", "VOUCHER_MAX_TTL_SECONDS"]);
+  const defaults = new Set(["HOST", "MAX_GAS", "MAX_FEE_PER_GAS_WEI", "MAX_DATA_BYTES", "MAX_DAILY_FEE_WEI", "WATCH_MAX_GAS", "WATCH_MAX_FEE_PER_GAS_WEI", "FAUCET_MAX_AMOUNT_WEI", "FAUCET_MAX_DAILY_WEI", "VOUCHER_MAX_TTL_SECONDS"]);
   for (const key of Object.keys(SignerConfigSchema.shape)) {
     assert.ok(key in vars !== defaults.has(key), `signer: ${key} is ${defaults.has(key) ? "a default and must not be" : "not"} declared in .railway/railway.ts`);
   }
   for (const key of Object.keys(vars)) assert.ok(key in SignerConfigSchema.shape, `signer: ${key} is not a setting it reads`);
   // Secrets are entered in Railway, never written in the repository.
-  const KEYS = ["PUBLISHER_KEY", "RELAYER_KEY", "FAUCET_SIGNER_KEY"];
+  const KEYS = ["PUBLISHER_KEY", "RELAYER_KEY", "FAUCET_SIGNER_KEY", "WATCH_KEY"];
   for (const key of [...KEYS, "SIGNER_TOKEN"]) assert.equal(vars[key]!.type, "preserve", `signer: ${key}`);
   // With the founders' values it starts, bound to the chain the node runs.
   const env: Record<string, string> = { SIGNER_TOKEN: "t".repeat(40) };

@@ -55,10 +55,10 @@ export function createApp(config: Config, options: AppOptions = {}) {
   const now = options.now ?? Date.now;
   const log = options.log ?? ((entry) => console.log(JSON.stringify(entry)));
   const account = (key: string | undefined): PrivateKeyAccount | undefined => (key ? privateKeyToAccount(key as Hex) : undefined);
-  const tx: Record<TxRole, { account?: PrivateKeyAccount; budget: DailyBudget }> = {
+  const tx: Record<TxRole, { account?: PrivateKeyAccount; budget: DailyBudget | null }> = {
     publisher: { account: account(config.PUBLISHER_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
     relayer: { account: account(config.RELAYER_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
-    watch: { account: account(config.WATCH_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
+    watch: { account: account(config.WATCH_KEY), budget: null },
   };
   const faucetSigner = account(config.FAUCET_SIGNER_KEY);
   const faucetBudget = new DailyBudget(config.FAUCET_MAX_DAILY_WEI);
@@ -72,6 +72,7 @@ export function createApp(config: Config, options: AppOptions = {}) {
     faucetMaxAmount: config.FAUCET_MAX_AMOUNT_WEI,
     voucherMaxTtl: BigInt(config.VOUCHER_MAX_TTL_SECONDS),
   };
+  const watchLimits: Limits = { ...limits, maxGas: BigInt(config.WATCH_MAX_GAS), maxFeePerGas: config.WATCH_MAX_FEE_PER_GAS_WEI };
   const expected = digest(config.SIGNER_TOKEN);
 
   const authorised = (req: IncomingMessage): boolean => {
@@ -89,8 +90,8 @@ export function createApp(config: Config, options: AppOptions = {}) {
     const { role, transaction } = parse(SignTransactionSchema, body);
     const signer = tx[role];
     if (!signer.account) throw new PolicyError("not_configured", 503);
-    const { call, maxFee } = checkTransaction(role, transaction, limits);
-    signer.budget.spend(maxFee, now());
+    const { call, maxFee } = checkTransaction(role, transaction, role === "watch" ? watchLimits : limits);
+    signer.budget?.spend(maxFee, now());
     const common = {
       chainId: transaction.chainId,
       to: transaction.to as Address,

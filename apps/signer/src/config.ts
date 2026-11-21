@@ -34,6 +34,13 @@ export const ConfigSchema = z.object({
   MAX_DATA_BYTES: z.coerce.number().int().positive().max(131_072).default(131_072),
   /** The most each transaction key may commit to fees (gas limit times fee cap) in one UTC day. */
   MAX_DAILY_FEE_WEI: wei("10000000000000000"),
+  /**
+   * The watch has no daily allowance, so nobody can use it up by asking for signatures that are never
+   * sent and leave the watch unable to stop a root. Its own caps bound each transaction instead: a veto
+   * or a pause needs under 100,000 gas.
+   */
+  WATCH_MAX_GAS: z.coerce.number().int().positive().max(1_000_000).default(200_000),
+  WATCH_MAX_FEE_PER_GAS_WEI: wei("100000000"),
 
   /** Voucher limits. Keep them at or under the faucet contract's own. */
   FAUCET_MAX_AMOUNT_WEI: wei("1000000000000000"),

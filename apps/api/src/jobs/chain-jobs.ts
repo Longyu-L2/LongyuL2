@@ -241,10 +241,11 @@ export async function indexEvents(deps: Deps, startBlock = 0n): Promise<number> 
         [e.txHash, deps.clock.now(), getAddress(e.account)],
       );
     } else if (e.kind === "activated") {
-      await deps.db.query("UPDATE settlements SET status = 'active' WHERE day = $1", [e.day]);
+      // By root as well as day: a root someone else posted for a day must not change our row for it.
+      await deps.db.query("UPDATE settlements SET status = 'active' WHERE day = $1 AND lower(root) = lower($2)", [e.day, e.root]);
       clearRootCache();
     } else if (e.kind === "vetoed") {
-      await deps.db.query("UPDATE settlements SET status = 'vetoed' WHERE day = $1", [e.day]);
+      await deps.db.query("UPDATE settlements SET status = 'vetoed' WHERE day = $1 AND lower(root) = lower($2)", [e.day, e.root]);
     }
   }
   await deps.db.query(
@@ -255,9 +256,9 @@ export async function indexEvents(deps: Deps, startBlock = 0n): Promise<number> 
   const { active } = await deps.chain.readRoots();
   if (active) {
     await deps.db.query(
-      `UPDATE settlements SET status = CASE WHEN day = $1 THEN 'active' ELSE 'superseded' END
+      `UPDATE settlements SET status = CASE WHEN day = $1 AND lower(root) = lower($2) THEN 'active' ELSE 'superseded' END
        WHERE status IN ('posted', 'active') AND day <= $1`,
-      [active.day],
+      [active.day, active.root],
     );
     clearRootCache();
   }

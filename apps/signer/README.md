@@ -33,7 +33,8 @@ Each transaction is also held to limits on gas, fee per gas and data size, and e
 | `DISTRIBUTOR_ADDRESS`, `FAUCET_ADDRESS` | The only contracts a transaction may call. Until the distributor is set, no transaction is signed |
 | `PUBLISHER_KEY`, `RELAYER_KEY`, `FAUCET_SIGNER_KEY`, `WATCH_KEY` | One key per role; the same key in two roles is refused |
 | `MAX_GAS`, `MAX_FEE_PER_GAS_WEI`, `MAX_DATA_BYTES` | Limits on one transaction |
-| `MAX_DAILY_FEE_WEI` | The most each transaction key may commit to fees in one UTC day |
+| `MAX_DAILY_FEE_WEI` | The most each transaction key may commit to fees in one UTC day. The watch key has no daily allowance, so requests that are never sent cannot use it up and leave the watch unable to act |
+| `WATCH_MAX_GAS`, `WATCH_MAX_FEE_PER_GAS_WEI` | The watch key's own limits per transaction: 200,000 gas and 0.1 gwei by default |
 | `FAUCET_MAX_AMOUNT_WEI`, `FAUCET_MAX_DAILY_WEI`, `VOUCHER_MAX_TTL_SECONDS` | Voucher limits, kept at or under the faucet contract's own |
 
 Defaults are in [src/config.ts](src/config.ts).

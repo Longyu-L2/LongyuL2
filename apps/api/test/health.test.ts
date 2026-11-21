@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { getAddress } from "viem";
-import { publishNext, watchRoots } from "../src/jobs/chain-jobs.ts";
+import { indexEvents, publishNext, watchRoots } from "../src/jobs/chain-jobs.ts";
 import { JOBS, beat } from "../src/jobs/runner.ts";
 import { settleNextDay } from "../src/jobs/settlement.ts";
 import { clearHealthCache } from "../src/modules/health.ts";
@@ -209,6 +209,10 @@ test("watch: a root this API did not compute is vetoed and the distributor pause
     assert.equal(env.chain.stops.length, 1);
     assert.equal(env.notices.length, 1);
     assert.equal(env.notices[0]!.subject, "Mining root stopped");
+    // The veto of somebody else's root leaves our own settlement for that day as it was.
+    await indexEvents(env.deps);
+    const row = await env.deps.db.query<{ status: string }>("SELECT status FROM settlements WHERE day = 0");
+    assert.equal(row.rows[0]!.status, "posted");
     assert.match(env.notices[0]!.text, /^the waiting root for day 0 was not computed here\. The watch vetoed it in 0x(5e)+ and paused the distributor in 0x(9a)+\. Replace the publisher key/);
 
     // An active foreign root can only be paused; once paused, nothing more is sent or said.

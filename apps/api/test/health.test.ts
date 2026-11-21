@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { getAddress } from "viem";
-import { publishNext } from "../src/jobs/chain-jobs.ts";
+import { publishNext, watchRoots } from "../src/jobs/chain-jobs.ts";
 import { JOBS, beat } from "../src/jobs/runner.ts";
 import { settleNextDay } from "../src/jobs/settlement.ts";
 import { clearHealthCache } from "../src/modules/health.ts";
@@ -165,6 +165,7 @@ test("health: a root on-chain that this API did not compute is critical", async 
       h = await health(env);
       assert.deepEqual([h.http, h.by["posted roots"]!.status], [503, "critical"], JSON.stringify(Object.keys(change)));
       assert.match(h.by["posted roots"]!.detail, /^the pending root for day 0 is not the one computed here: veto it, pause the distributor and stop the signer/);
+      env.chain.pending = ours;
     }
     // A day this API never settled.
     env.chain.pending = { ...ours, day: 5n };
@@ -182,6 +183,66 @@ test("health: a root on-chain that this API did not compute is critical", async 
     env.chain.active = ours;
     h = await health(env);
     assert.equal(h.by["posted roots"]!.status, "ok");
+  } finally {
+    await env.close();
+  }
+});
+
+test("watch: a root this API did not compute is vetoed and the distributor paused, once", async () => {
+  const env = await makeEnv();
+  try {
+    const a = await readyUser(env, "a");
+    env.clock.at(0n, 3600n);
+    await mine(env, a);
+    assert.equal(await watchRoots(env.deps), null, "no root at all");
+    env.clock.at(1n, 20n * 60n);
+    await settleNextDay(env.deps);
+    await publishNext(env.deps);
+    assert.equal(await watchRoots(env.deps), null, "our own root is left alone");
+    assert.deepEqual(env.chain.stops, []);
+
+    const ours = env.chain.pending!;
+    env.chain.pending = { ...ours, root: `0x${"9".repeat(64)}` };
+    assert.equal(await watchRoots(env.deps), "the waiting root for day 0 was not computed here");
+    assert.equal(env.chain.pending, null, "vetoed");
+    assert.equal(env.chain.health.paused, true);
+    assert.equal(env.chain.stops.length, 1);
+    assert.equal(env.notices.length, 1);
+    assert.equal(env.notices[0]!.subject, "Mining root stopped");
+    assert.match(env.notices[0]!.text, /^the waiting root for day 0 was not computed here\. The watch vetoed it in 0x(5e)+ and paused the distributor in 0x(9a)+\. Replace the publisher key/);
+
+    // An active foreign root can only be paused; once paused, nothing more is sent or said.
+    env.chain.health.paused = false;
+    env.chain.active = { ...ours, totalEntitled: ours.totalEntitled + 1n };
+    assert.equal(await watchRoots(env.deps), "the active root for day 0 was not computed here");
+    assert.deepEqual(env.chain.stops.at(-1), { vetoed: null, paused: `0x${"9a".repeat(32)}` });
+    assert.equal(env.notices.length, 2);
+    assert.equal(await watchRoots(env.deps), "the active root for day 0 was not computed here");
+    assert.deepEqual(env.chain.stops.at(-1), { vetoed: null, paused: null });
+    assert.equal(env.notices.length, 2, "no repeat notice");
+
+    // Without the watch key the job fails, so the health page shows it.
+    env.chain.watchKey = false;
+    await assert.rejects(watchRoots(env.deps), /watch key is not configured/);
+  } finally {
+    await env.close();
+  }
+});
+
+test("health: the watch key must be a guardian with gas", async () => {
+  const env = await makeEnv();
+  try {
+    await allJobsSucceeded(env);
+    let h = await health(env);
+    assert.deepEqual([h.by.watch!.status, h.by.watch!.detail], ["ok", "guardian, 5.000 gas (warn below 0.002)"]);
+    env.chain.health.watch = { balance: 5n * E18, guardian: false };
+    h = await health(env);
+    assert.deepEqual([h.http, h.by.watch!.status], [503, "critical"]);
+    env.chain.health.watch = null;
+    h = await health(env);
+    assert.deepEqual([h.by.watch!.status, h.by.watch!.detail], ["warn", "no watch key: a root that was not computed here waits for a person"]);
+    env.chain.health.watch = { balance: 1n, guardian: true };
+    assert.equal((await health(env)).by.watch!.status, "critical");
   } finally {
     await env.close();
   }

@@ -17,7 +17,7 @@ import { checkTransaction, checkVoucher, DailyBudget, PolicyError, TransactionSc
 /** Twice the largest call data in hex, with room for the other fields. */
 const MAX_BODY_BYTES = 300_000;
 
-const SignTransactionSchema = z.strictObject({ role: z.enum(["publisher", "relayer"]), transaction: TransactionSchema });
+const SignTransactionSchema = z.strictObject({ role: z.enum(["publisher", "relayer", "watch"]), transaction: TransactionSchema });
 
 export const VOUCHER_TYPES = {
   Voucher: [
@@ -58,6 +58,7 @@ export function createApp(config: Config, options: AppOptions = {}) {
   const tx: Record<TxRole, { account?: PrivateKeyAccount; budget: DailyBudget }> = {
     publisher: { account: account(config.PUBLISHER_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
     relayer: { account: account(config.RELAYER_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
+    watch: { account: account(config.WATCH_KEY), budget: new DailyBudget(config.MAX_DAILY_FEE_WEI) },
   };
   const faucetSigner = account(config.FAUCET_SIGNER_KEY);
   const faucetBudget = new DailyBudget(config.FAUCET_MAX_DAILY_WEI);
@@ -144,6 +145,7 @@ export function createApp(config: Config, options: AppOptions = {}) {
           publisher: tx.publisher.account?.address ?? null,
           relayer: tx.relayer.account?.address ?? null,
           faucetSigner: faucetSigner?.address ?? null,
+          watch: tx.watch.account?.address ?? null,
         });
       }
       if (req.method === "POST" && path === "/v1/sign/transaction") return reply(200, await signTransaction(await readJson(req)));

@@ -43,6 +43,8 @@ export interface ChainHealth {
   relayerBalance: bigint | null;
   vaultBalance: bigint | null;
   faucetBalance: bigint | null;
+  /** The watch key's gas and whether it holds the guardian role; null without a watch key. */
+  watch: { balance: bigint; guardian: boolean } | null;
 }
 
 /** A transfer of the reward asset: native value (logIndex -1) or a token Transfer event. */
@@ -108,6 +110,8 @@ export interface ChainGateway {
   readDistributorConfig(): Promise<{ maxRewardPerDay: bigint; maxDailyIncrease: bigint; challengeDelay: bigint }>;
   readRoots(): Promise<{ active: RootInfo | null; pending: RootInfo | null }>;
   proposeRoot(day: bigint, root: Hex, total: bigint, dataHash: Hex, uri: string): Promise<Hex>;
+  /** With the watch key: vetoes the waiting root, if any, and pauses the distributor unless it is paused. */
+  stopRoots(): Promise<{ vetoed: Hex | null; paused: Hex | null }>;
   /** `onSent` is called with the hash as soon as the transaction is out, before it confirms. */
   claimMany(items: ClaimItem[], onSent?: (txHash: Hex) => Promise<void>): Promise<{ txHash: Hex; events: DistributorEvent[] }>;
   dripFaucet(recipient: Address, amount: bigint): Promise<Hex>;
@@ -178,6 +182,8 @@ export interface ViemChainOptions {
   publisher?: LocalAccount;
   relayer?: LocalAccount;
   faucetSigner?: LocalAccount;
+  /** Holds only the distributor's guardian role. */
+  watch?: LocalAccount;
   bscRpcUrl: string;
   babtAddress: Address;
 }
@@ -222,6 +228,7 @@ export function createViemChain(o: ViemChainOptions): ChainGateway {
   const babt = createBabtReader(o);
   const relayerLock = new Mutex();
   const publisherLock = new Mutex();
+  const watchLock = new Mutex();
 
   const need = <T>(v: T | undefined, what: string): T => {
     if (!v) throw new Error(`${what} is not configured`);
@@ -306,6 +313,21 @@ export function createViemChain(o: ViemChainOptions): ChainGateway {
         args: [day, root, total, dataHash, uri],
       } as never);
       return receipt.transactionHash;
+    },
+
+    async stopRoots() {
+      const account = need(o.watch, "watch key");
+      const call = (functionName: "vetoPendingRoot" | "pause") =>
+        send(account, watchLock, { address: o.distributor, abi: miningDistributorAbi, functionName } as never).then((r) => r.transactionHash);
+      const pending = toRoot(await pub.readContract({ address: o.distributor, abi: miningDistributorAbi, functionName: "pendingRoot" }));
+      let vetoed: Hex | null = null;
+      let failed: unknown = null;
+      // The pause goes out even if the veto fails: it holds the root back for as long as it lasts.
+      if (pending) vetoed = await call("vetoPendingRoot").catch((e: unknown) => ((failed = e), null));
+      const isPaused = await pub.readContract({ address: o.distributor, abi: miningDistributorAbi, functionName: "paused" });
+      const paused = isPaused ? null : await call("pause");
+      if (failed) throw failed;
+      return { vetoed, paused };
     },
 
     async claimMany(items, onSent) {
@@ -424,7 +446,14 @@ export function createViemChain(o: ViemChainOptions): ChainGateway {
           ? pub.readContract({ address: o.faucet, abi: faucetAbi, functionName: "asset" }).then((a) => holding(a, o.faucet!))
           : Promise.resolve(null),
       ]);
-      return { block: block.number!, blockTime: block.timestamp, paused, publisherBalance, relayerBalance, vaultBalance, faucetBalance };
+      const watch = o.watch
+        ? await Promise.all([
+            pub.getBalance({ address: o.watch.address }),
+            pub.readContract({ address: o.distributor, abi: miningDistributorAbi, functionName: "GUARDIAN_ROLE" }).then((role) =>
+              pub.readContract({ address: o.distributor, abi: miningDistributorAbi, functionName: "hasRole", args: [role, o.watch!.address] })),
+          ]).then(([balance, guardian]) => ({ balance, guardian }))
+        : null;
+      return { block: block.number!, blockTime: block.timestamp, paused, publisherBalance, relayerBalance, vaultBalance, faucetBalance, watch };
     },
   };
 }

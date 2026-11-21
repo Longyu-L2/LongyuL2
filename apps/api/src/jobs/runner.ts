@@ -1,6 +1,6 @@
 import { hostname } from "node:os";
 import type { Deps } from "../context.ts";
-import { cleanup, indexEvents, processFaucet, publishNext, relayClaims, sendReminders } from "./chain-jobs.ts";
+import { cleanup, indexEvents, processFaucet, publishNext, relayClaims, sendReminders, watchRoots } from "./chain-jobs.ts";
 import { settleNextDay } from "./settlement.ts";
 import { watchPayments } from "./payments.ts";
 import { indexTransfers } from "./transfers.ts";
@@ -18,6 +18,8 @@ export const JOBS: Job[] = [
   // Settling a large day takes minutes; the long lease stops a second instance starting the same day.
   { name: "settlement", everyMs: 60_000, leaseSeconds: 2 * 3600, run: settleNextDay },
   { name: "publisher", everyMs: 60_000, leaseSeconds: 600, run: publishNext },
+  // Stops a root this API did not compute, well inside its challenge delay.
+  { name: "watch", everyMs: 30_000, leaseSeconds: 300, run: watchRoots },
   // Claims and faucet drips share the relayer key, so they share one job and one lease.
   { name: "relayer", everyMs: 15_000, leaseSeconds: 600, run: async (d) => { await relayClaims(d); await processFaucet(d); } },
   { name: "payments", everyMs: 30_000, leaseSeconds: 300, run: watchPayments },

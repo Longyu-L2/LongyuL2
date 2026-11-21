@@ -6,7 +6,7 @@ import { parseTransaction, recoverTransactionAddress, recoverTypedDataAddress, t
 import { privateKeyToAddress } from "viem/accounts";
 import { createApp, VOUCHER_TYPES } from "../src/app.ts";
 import { loadConfig } from "../src/config.ts";
-import { claimMany, DISTRIBUTOR, drip, FAUCET, proposeRoot } from "./fixtures.ts";
+import { claimMany, DISTRIBUTOR, drip, FAUCET, pause, proposeRoot, unpause, veto } from "./fixtures.ts";
 
 const key = (n: string) => `0x${n.repeat(64)}` as Hex;
 const TOKEN = "signer-test-token-0123456789abcdef";
@@ -18,6 +18,7 @@ const env = {
   PUBLISHER_KEY: key("1"),
   RELAYER_KEY: key("2"),
   FAUCET_SIGNER_KEY: key("3"),
+  WATCH_KEY: key("4"),
 };
 const NOW = 1_800_000_000_000;
 
@@ -82,7 +83,22 @@ test("accounts lists the addresses and what the policy is bound to", async () =>
     publisher: privateKeyToAddress(key("1")),
     relayer: privateKeyToAddress(key("2")),
     faucetSigner: privateKeyToAddress(key("3")),
+    watch: privateKeyToAddress(key("4")),
   });
+});
+
+test("the watch key signs a veto and a pause, and nothing else", async () => {
+  for (const data of [veto, pause]) {
+    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data }) });
+    assert.equal(r.status, 200);
+    const { signedTransaction } = (await r.json()) as { signedTransaction: TransactionSerialized };
+    assert.equal(await recoverTransactionAddress({ serializedTransaction: signedTransaction }), privateKeyToAddress(key("4")));
+    assert.equal(parseTransaction(signedTransaction).data, data);
+  }
+  for (const data of [proposeRoot, unpause]) {
+    const r = await call(base, "/v1/sign/transaction", { role: "watch", transaction: wire({ data }) });
+    assert.deepEqual([r.status, await r.json()], [403, { error: "call_not_allowed" }]);
+  }
 });
 
 test("the publisher signs a root proposal exactly as asked", async () => {

@@ -29,6 +29,7 @@ The network is on testnet. The contracts have unit, fuzz and invariant tests and
 These hold even if a backend key is stolen:
 
 - A mining root becomes claimable only after a challenge delay, and the guardian can veto it during that time.
+- The watch on the challenge delay is automatic: every 30 seconds the API compares the roots on chain with the ones it computed, and on a mismatch a key that holds only the guardian role vetoes a waiting root and pauses claims. Only the admin unpauses.
 - A root's total can never exceed the emission schedule's cumulative budget, and can grow by at most a fixed amount per day.
 - The vault releases funds only up to what is entitled and unclaimed. It has no withdraw function.
 - The faucet enforces its own daily cap on chain.
@@ -39,7 +40,7 @@ Known limits of the testnet deployment, to be closed before mainnet:
 
 - One testnet admin key holds every privileged role: the rollup's upgrade rights on BSC (through SystemOwnerSafe, a Safe with that key as its only signer), the L2 ProxyAdmin (`0x4200000000000000000000000000000000000018`), the system config, the admin and guardian roles of the mining contracts, the swap factory's fee setter, and the tLONG on BSC testnet that has not been bridged. Mainnet moves each of them to a multisig, the upgrade and admin roles behind a timelock.
 - The growth limit bounds a root's total, not who it pays. A stolen publisher key could propose a root that hands everything entitled and not yet claimed to other accounts, within the bound per account. The challenge delay and the guardian's veto are the defence, and the API's health check reports any root on chain that it did not compute.
-- The guardian's veto depends on someone looking within the challenge delay. The delay is a setting and the watch is manual on testnet.
+- The automatic watch runs inside the API, the same service that computes the roots, and it vetoes only what that service's own records do not match. If the API's server or database is taken over as well, the watch is gone with it. Its key can veto and pause, so whoever takes the API can also stop claims until the admin unpauses; that halts claims and moves no funds.
 - A root that waited through a pause becomes claimable when the pause ends. That is an admin-only path.
 - A withdrawal to BSC can be finalized 10 minutes after its state root is posted; the stack's usual wait is seven days. A wrong state root can be deleted only inside that window, by the challenger (the admin key), and nothing deletes one automatically. Whoever held the proposer key could post a false root and take what the bridge holds on BSC testnet, which is test BNB and tLONG. The wait was shortened on 21 November 2026 so that testers get a withdrawal back in minutes.
 - Mining on testnet does not wait for an identity check, so one person with several X accounts and devices can mine with each. That dilutes other miners' share of the fixed daily budget and cannot enlarge it. Mainnet conversion counts verified accounts only.
@@ -49,7 +50,7 @@ Known limits of the testnet deployment, to be closed before mainnet:
 
 - An external audit of the mining contracts, the faucet, the payment router and the two swap patches.
 - Multisigs for every role above, with a timelock on upgrades and admin settings, and the handover checked on chain.
-- A watch on the challenge delay that does not depend on one person, and a delay long enough for it.
+- A second watch, run apart from the API and with its own guardian key, so that taking over the API does not also remove the watch.
 - A one-hour withdrawal wait, and with it a challenger that checks every posted state root against its own node and deletes a wrong one without a person. A wait that short is only as safe as that challenger, so it is part of the audit, and it runs on separate infrastructure from the proposer.
 - Identity verification before any conversion to LONG.
 - The sequencer, batcher and proposer keys in hardware or a key service, and a second L1 RPC provider.

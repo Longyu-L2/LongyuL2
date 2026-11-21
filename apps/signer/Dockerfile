@@ -1,4 +1,4 @@
-# LONGYU's signer: holds the publisher, relayer and faucet-signer keys and signs only what its policy allows.
+# LONGYU's signer: holds the publisher, relayer, faucet-signer and watch keys and signs only what its policy allows.
 # Private network only: never give this service a public domain.
 # Build from the repository root: docker build -f apps/signer/Dockerfile -t longyu-signer .
 FROM node:24-slim

@@ -10,6 +10,7 @@ import { toBig } from "../lib/util.ts";
 import { paymentConfig } from "../services/payments.ts";
 import { JOBS } from "./runner.ts";
 import { SETTLE_GRACE_SECONDS } from "./settlement.ts";
+import { isComputedHere } from "./chain-jobs.ts";
 
 export type Level = "ok" | "warn" | "critical";
 export interface Check {
@@ -73,6 +74,9 @@ export async function computeHealth(deps: Deps): Promise<Health> {
       if (bal === null) add(name, "warn", "signer not configured");
       else add(name, level(bal < minGas / 5n, bal < minGas), `${fmt(bal)} (warn below ${fmt(minGas)})`);
     }
+    if (c.watch === null) add("watch", "warn", "no watch key: a root that was not computed here waits for a person");
+    else if (!c.watch.guardian) add("watch", "critical", "the watch key is not a guardian of the distributor: it cannot stop a root");
+    else add("watch", level(c.watch.balance < minGas / 5n, c.watch.balance < minGas), `guardian, ${fmt(c.watch.balance)} gas (warn below ${fmt(minGas)})`);
     if (c.vaultBalance !== null) {
       const perDay = dailyBudget(deps.schedule, currentDay(deps));
       const days = perDay === 0n ? null : c.vaultBalance / perDay;
@@ -138,19 +142,12 @@ export async function computeHealth(deps: Deps): Promise<Health> {
   });
 
   // The publisher key signs outside this API (the signer service or KMS). A root on-chain that this
-  // API did not compute means the key signed for someone else: the guardian vetoes it while it is pending.
+  // API did not compute means the key signed for someone else; the watch job stops it (watchRoots).
   await guard("posted roots", async () => {
     const { active, pending } = await deps.chain.readRoots();
     const foreign: string[] = [];
     for (const [label, r] of [["pending", pending], ["active", active]] as const) {
-      if (!r) continue;
-      const ours = (await deps.db.query<{ root: string | null; total_entitled: string; data_hash: string }>(
-        "SELECT root, total_entitled::text, data_hash FROM settlements WHERE day = $1",
-        [r.day],
-      )).rows[0];
-      const same = ours?.root?.toLowerCase() === r.root.toLowerCase() && toBig(ours.total_entitled) === r.totalEntitled
-        && ours.data_hash.toLowerCase() === r.dataHash.toLowerCase();
-      if (!same) foreign.push(`the ${label} root for day ${r.day} is not the one computed here`);
+      if (r && !(await isComputedHere(deps, r))) foreign.push(`the ${label} root for day ${r.day} is not the one computed here`);
     }
     if (foreign.length === 0) add("posted roots", "ok", pending || active ? "the roots on-chain are the ones computed here" : "no root posted yet");
     else add("posted roots", "critical", `${foreign.join("; ")}: ${pending && foreign[0]!.includes("pending") ? "veto it, " : ""}pause the distributor and stop the signer`);

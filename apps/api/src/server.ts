@@ -36,7 +36,7 @@ async function signer(config: Config, key: Hex | undefined, kmsKeyId: string | u
 export async function signers(config: Config, fetchImpl?: typeof fetch): Promise<RemoteAccounts> {
   if (config.SIGNER_URL || config.SIGNER_TOKEN) {
     if (!config.SIGNER_URL || !config.SIGNER_TOKEN) throw new Error("SIGNER_URL and SIGNER_TOKEN are set together");
-    if (config.PUBLISHER_KEY || config.RELAYER_KEY || config.FAUCET_SIGNER_KEY) throw new Error("SIGNER_URL replaces the signing keys");
+    if (config.PUBLISHER_KEY || config.RELAYER_KEY || config.FAUCET_SIGNER_KEY || config.WATCH_KEY) throw new Error("SIGNER_URL replaces the signing keys");
     return remoteAccounts({
       url: config.SIGNER_URL,
       token: config.SIGNER_TOKEN,
@@ -50,6 +50,7 @@ export async function signers(config: Config, fetchImpl?: typeof fetch): Promise
     publisher: await signer(config, config.PUBLISHER_KEY as Hex | undefined, config.KMS_PUBLISHER_KEY_ID),
     relayer: await signer(config, config.RELAYER_KEY as Hex | undefined, config.KMS_RELAYER_KEY_ID),
     faucetSigner: await signer(config, config.FAUCET_SIGNER_KEY as Hex | undefined, config.KMS_FAUCET_SIGNER_KEY_ID),
+    watch: await signer(config, config.WATCH_KEY as Hex | undefined, undefined),
   };
 }
 

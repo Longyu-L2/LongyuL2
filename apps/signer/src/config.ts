@@ -25,6 +25,8 @@ export const ConfigSchema = z.object({
   PUBLISHER_KEY: privateKey.optional(),
   RELAYER_KEY: privateKey.optional(),
   FAUCET_SIGNER_KEY: privateKey.optional(),
+  /** Holds only the distributor's guardian role: vetoes a root the API did not compute and pauses claims. */
+  WATCH_KEY: privateKey.optional(),
 
   /** Limits on one transaction. */
   MAX_GAS: z.coerce.number().int().positive().default(5_000_000),
@@ -44,7 +46,7 @@ export type Config = z.infer<typeof ConfigSchema>;
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   // Blank values mean "not set", never an empty secret.
   const config = ConfigSchema.parse(Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== "")));
-  const keys = [config.PUBLISHER_KEY, config.RELAYER_KEY, config.FAUCET_SIGNER_KEY].filter((k): k is string => !!k).map((k) => k.toLowerCase());
+  const keys = [config.PUBLISHER_KEY, config.RELAYER_KEY, config.FAUCET_SIGNER_KEY, config.WATCH_KEY].filter((k): k is string => !!k).map((k) => k.toLowerCase());
   if (new Set(keys).size !== keys.length) throw new Error("each role needs its own key");
   const token = config.SIGNER_TOKEN.toLowerCase();
   if (keys.some((k) => k === token || k.slice(2) === token)) throw new Error("SIGNER_TOKEN must not be a signing key");
@@ -58,10 +60,11 @@ export interface Addresses {
   publisher?: Address;
   relayer?: Address;
   faucetSigner?: Address;
+  watch?: Address;
 }
 
 /** The public addresses of the configured keys. */
 export function addresses(config: Config): Addresses {
   const of = (key: string | undefined) => (key ? privateKeyToAddress(key as Hex) : undefined);
-  return { publisher: of(config.PUBLISHER_KEY), relayer: of(config.RELAYER_KEY), faucetSigner: of(config.FAUCET_SIGNER_KEY) };
+  return { publisher: of(config.PUBLISHER_KEY), relayer: of(config.RELAYER_KEY), faucetSigner: of(config.FAUCET_SIGNER_KEY), watch: of(config.WATCH_KEY) };
 }

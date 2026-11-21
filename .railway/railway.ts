@@ -135,10 +135,10 @@ export default defineRailway(() => {
   });
 
   // ----------------------------------------------------------------- signer
-  // Holds the publisher, relayer and faucet-voucher keys, and signs only what apps/signer/src/policy.ts
-  // allows: proposeRoot, claimMany and drip on the two contracts below, and faucet vouchers, each
-  // within limits. The API holds no key; it asks this service over the private network, with the token.
-  // Never give this service a public domain. Seal the three keys in the dashboard once they are set.
+  // Holds the publisher, relayer, faucet-voucher and watch keys, and signs only what
+  // apps/signer/src/policy.ts allows: proposeRoot, claimMany, vetoPendingRoot and pause, and drip on the
+  // two contracts below, and faucet vouchers, each within limits. The API holds no key; it asks this service over the private network, with the token.
+  // Never give this service a public domain. Seal the four keys in the dashboard once they are set.
   // The limits keep the defaults in apps/signer/src/config.ts. Port 8080.
   const signer = service("signer", {
     source,
@@ -153,6 +153,8 @@ export default defineRailway(() => {
       PUBLISHER_KEY: preserve(),
       RELAYER_KEY: preserve(),
       FAUCET_SIGNER_KEY: preserve(),
+      // The automatic watch: a key with only the distributor's guardian role (veto and pause).
+      WATCH_KEY: preserve(),
       // Until the mining contracts exist it starts without these and signs nothing.
       DISTRIBUTOR_ADDRESS: preserve(),
       FAUCET_ADDRESS: preserve(),

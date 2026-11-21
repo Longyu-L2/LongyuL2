@@ -1,5 +1,6 @@
 /** Jobs that talk to the chain: publish roots, relay claims, index events, send reminders. */
 import { getAddress, type Hex } from "viem";
+import type { RootInfo } from "../services/chain.ts";
 import { hashJson, type Address } from "@longyu/reward-engine";
 import type { Deps } from "../context.ts";
 import { TxError, type DistributorEvent } from "../services/chain.ts";
@@ -50,6 +51,38 @@ export async function publishNext(deps: Deps): Promise<bigint | null> {
     await q.query("UPDATE settlements SET status = 'superseded' WHERE status = 'computed' AND day < $1", [newest.day]);
   });
   return newest.day;
+}
+
+/** True when `r` is the root computed here for its day: the same root, total and data hash. */
+export async function isComputedHere(deps: Deps, r: RootInfo): Promise<boolean> {
+  const ours = (await deps.db.query<{ root: string | null; total_entitled: string; data_hash: string }>(
+    "SELECT root, total_entitled::text, data_hash FROM settlements WHERE day = $1",
+    [r.day],
+  )).rows[0];
+  return !!ours && ours.root?.toLowerCase() === r.root.toLowerCase() && toBig(ours.total_entitled) === r.totalEntitled
+    && ours.data_hash.toLowerCase() === r.dataHash.toLowerCase();
+}
+
+/**
+ * The automatic watch. The publisher key signs outside this API, so a root on chain that was not
+ * computed here means the key signed for someone else. The watch key, which holds only the guardian
+ * role, then vetoes a waiting root and pauses the distributor; an active one can only be paused.
+ * Only the admin can unpause. Returns what was found, or null when every root is ours.
+ */
+export async function watchRoots(deps: Deps): Promise<string | null> {
+  const { active, pending } = await deps.chain.readRoots();
+  const foreign: string[] = [];
+  for (const [label, r] of [["waiting", pending], ["active", active]] as const) {
+    if (r && !(await isComputedHere(deps, r))) foreign.push(`the ${label} root for day ${r.day}`);
+  }
+  if (foreign.length === 0) return null;
+  const found = `${foreign.join(" and ")} ${foreign.length > 1 ? "were" : "was"} not computed here`;
+  const { vetoed, paused } = await deps.chain.stopRoots();
+  if (vetoed || paused) {
+    const done = [vetoed && `vetoed it in ${vetoed}`, paused && `paused the distributor in ${paused}`].filter(Boolean).join(" and ");
+    await deps.notifier.notify("Mining root stopped", `${found}. The watch ${done}. Replace the publisher key, then unpause with the admin key.`);
+  }
+  return found;
 }
 
 /** Closes the claims of one mined claimMany transaction from its events. Rows already closed are left alone. */

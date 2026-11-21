@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { loadConfig } from "../src/config.ts";
 import { checkTransaction, checkVoucher, DailyBudget, PolicyError, TransactionSchema } from "../src/policy.ts";
-import { claimMany, DISTRIBUTOR, drip, FAUCET, limits, OTHER, pause, proposeRoot, tx } from "./fixtures.ts";
+import { claimMany, DISTRIBUTOR, drip, FAUCET, limits, OTHER, pause, proposeRoot, tx, unpause, veto } from "./fixtures.ts";
 
 const refused = (fn: () => unknown, code: string, status = 403) =>
   assert.throws(fn, (e) => e instanceof PolicyError && e.code === code && e.status === status, `expected ${code}`);
@@ -25,6 +25,20 @@ test("the relayer may only relay claims and faucet drips", () => {
   refused(() => checkTransaction("relayer", tx({ to: OTHER, data: claimMany }), limits), "target_not_allowed");
   // Without a faucet, its address is not a target.
   refused(() => checkTransaction("relayer", tx({ to: FAUCET, data: drip }), { ...limits, faucet: undefined }), "target_not_allowed");
+});
+
+test("the watch may only veto a waiting root and pause the distributor", () => {
+  assert.equal(checkTransaction("watch", tx({ data: veto }), limits).call, "vetoPendingRoot");
+  assert.equal(checkTransaction("watch", tx({ data: pause }), limits).call, "pause");
+  for (const data of [proposeRoot, claimMany, unpause, "0x", `${pause}00`, `${veto}${"00".repeat(32)}`]) {
+    refused(() => checkTransaction("watch", tx({ data: data as `0x${string}` }), limits), "call_not_allowed");
+  }
+  refused(() => checkTransaction("watch", tx({ to: FAUCET, data: pause }), limits), "target_not_allowed");
+  refused(() => checkTransaction("watch", tx({ to: OTHER, data: veto }), limits), "target_not_allowed");
+  refused(() => checkTransaction("watch", tx({ data: veto, value: 1n }), limits), "value_not_allowed");
+  // The other keys cannot stop roots or claims.
+  refused(() => checkTransaction("publisher", tx({ data: veto }), limits), "call_not_allowed");
+  refused(() => checkTransaction("relayer", tx({ data: pause }), limits), "call_not_allowed");
 });
 
 test("the address check ignores letter case", () => {
@@ -102,6 +116,7 @@ test("configuration refuses shared keys, a key used as the token and a short tok
   assert.equal(config.MAX_FEE_PER_GAS_WEI, 1_000_000_000n);
   assert.equal(config.DISTRIBUTOR_ADDRESS, undefined);
   assert.throws(() => loadConfig({ ...env, RELAYER_KEY: key("1") }), /its own key/);
+  assert.throws(() => loadConfig({ ...env, WATCH_KEY: key("2") }), /its own key/);
   assert.throws(() => loadConfig({ ...env, SIGNER_TOKEN: key("3") }), /must not be a signing key/);
   assert.throws(() => loadConfig({ ...env, SIGNER_TOKEN: "3".repeat(64) }), /must not be a signing key/);
   assert.throws(() => loadConfig({ ...env, SIGNER_TOKEN: "short" }));

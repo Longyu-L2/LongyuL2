@@ -143,6 +143,7 @@ export interface RemoteAccounts {
   publisher?: LocalAccount;
   relayer?: LocalAccount;
   faucetSigner?: LocalAccount;
+  watch?: LocalAccount;
 }
 
 const VOUCHER_FIELDS = "recipient:address,amount:uint256,nonce:uint256,deadline:uint256";
@@ -180,7 +181,7 @@ export async function remoteAccounts(o: RemoteSignerOptions): Promise<RemoteAcco
     throw new Error(`the signer does not sign ${what}`);
   };
 
-  const transactionAccount = (role: "publisher" | "relayer", address: Address): LocalAccount =>
+  const transactionAccount = (role: "publisher" | "relayer" | "watch", address: Address): LocalAccount =>
     toAccount({
       address,
       signMessage: refuse("messages"),
@@ -277,9 +278,11 @@ export async function remoteAccounts(o: RemoteSignerOptions): Promise<RemoteAcco
   const publisher = address(info.publisher, "publisher");
   const relayer = address(info.relayer, "relayer");
   const faucetSigner = address(info.faucetSigner, "faucet signer");
+  const watch = address(info.watch, "watch");
   return {
     publisher: publisher && transactionAccount("publisher", publisher),
     relayer: relayer && transactionAccount("relayer", relayer),
     faucetSigner: faucetSigner && voucherAccount(faucetSigner),
+    watch: watch && transactionAccount("watch", watch),
   };
 }

@@ -23,6 +23,8 @@ export const proposeRoot = encodeFunctionData({ abi: miningDistributorAbi, funct
 export const claimMany = encodeFunctionData({ abi: miningDistributorAbi, functionName: "claimMany", args: [[OTHER], [5n], [[WORD]]] });
 export const drip = encodeFunctionData({ abi: faucetAbi, functionName: "drip", args: [OTHER, 1n, 2n, 3n, "0x1234"] });
 export const pause = encodeFunctionData({ abi: miningDistributorAbi, functionName: "pause" });
+export const veto = encodeFunctionData({ abi: miningDistributorAbi, functionName: "vetoPendingRoot" });
+export const unpause = encodeFunctionData({ abi: miningDistributorAbi, functionName: "unpause" });
 
 export const tx = (over: Partial<TransactionRequest> = {}): TransactionRequest => ({
   type: "eip1559",

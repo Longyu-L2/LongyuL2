@@ -95,6 +95,23 @@ export class FakeChain implements ChainGateway {
     this.events.push({ kind: "proposed", day, root, block: ++this.block });
     return `0x${"ab".repeat(32)}` as Hex;
   }
+  /** False: the watch key is missing, as without WATCH_KEY on the signer. */
+  watchKey = true;
+  readonly stops: { vetoed: Hex | null; paused: Hex | null }[] = [];
+  async stopRoots() {
+    if (!this.watchKey) throw new Error("watch key is not configured");
+    this.promote();
+    let vetoed: Hex | null = null;
+    if (this.pending) {
+      this.events.push({ kind: "vetoed", day: this.pending.day, root: this.pending.root, block: ++this.block });
+      this.pending = null;
+      vetoed = `0x${"5e".repeat(32)}` as Hex;
+    }
+    const paused = this.health.paused ? null : (`0x${"9a".repeat(32)}` as Hex);
+    this.health.paused = true;
+    this.stops.push({ vetoed, paused });
+    return { vetoed, paused };
+  }
   async claimMany(items: ClaimItem[], onSent?: (txHash: Hex) => Promise<void>) {
     this.promote();
     const fault = this.nextClaim;
@@ -151,6 +168,7 @@ export class FakeChain implements ChainGateway {
   }
   health: ChainHealth = {
     block: 0n, blockTime: 0n, paused: false, publisherBalance: 5n * E18, relayerBalance: 5n * E18, vaultBalance: 1_000_000_000n * E18, faucetBalance: 10_000n * E18,
+    watch: { balance: 5n * E18, guardian: true },
   };
   transfers: RewardTransfer[] = [];
   failedTxs = new Set<string>();

@@ -24,6 +24,7 @@ Each job takes a lease in the database, so two instances of the API never run th
 | indexer | 5 s | Follows the distributor's events: claims, activations and vetoes |
 | settlement | 60 s | Settles the newest closed day and writes its data file |
 | publisher | 60 s | Posts a settled day's root |
+| watch | 30 s | Compares the roots on chain with the ones computed here; on a mismatch it vetoes a waiting root and pauses the distributor with the signer's guardian-only watch key |
 | relayer | 15 s | Sends queued claims and faucet drips |
 | payments | 30 s | Reads PaymentRouter on BSC, only when payments are configured |
 | transfers | 30 s | Follows the reward token's transfers for the wallet-sweep rule |

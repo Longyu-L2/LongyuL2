@@ -43,6 +43,8 @@ export const ConfigSchema = z.object({
   PUBLISHER_KEY: privateKey.optional(),
   RELAYER_KEY: privateKey.optional(),
   FAUCET_SIGNER_KEY: privateKey.optional(),
+  /** Outside production only: the guardian-only key of the automatic watch. With SIGNER_URL it is the signer's. */
+  WATCH_KEY: privateKey.optional(),
   KMS_REGION: z.string().optional(),
   KMS_PUBLISHER_KEY_ID: z.string().optional(),
   KMS_RELAYER_KEY_ID: z.string().optional(),
@@ -289,7 +291,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!config.TELEGRAM_BOT_TOKEN !== !config.TELEGRAM_CHAT_ID) throw new Error("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID are set together");
   if (!config.L1_RPC_URL !== !config.L1_WATCH) throw new Error("L1_RPC_URL and L1_WATCH are set together");
   parseL1Watch(config.L1_WATCH);
-  const rawKeys = [config.PUBLISHER_KEY, config.RELAYER_KEY, config.FAUCET_SIGNER_KEY].some(Boolean);
+  const rawKeys = [config.PUBLISHER_KEY, config.RELAYER_KEY, config.FAUCET_SIGNER_KEY, config.WATCH_KEY].some(Boolean);
   const kmsKeys = [config.KMS_PUBLISHER_KEY_ID, config.KMS_RELAYER_KEY_ID, config.KMS_FAUCET_SIGNER_KEY_ID].some(Boolean);
   if (!config.SIGNER_URL !== !config.SIGNER_TOKEN) throw new Error("SIGNER_URL and SIGNER_TOKEN are set together");
   if (config.SIGNER_URL) {

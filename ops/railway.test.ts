@@ -116,7 +116,7 @@ test("railway: the API declares every setting and its literals pass production v
   // Development-only or refused in production: deliberately absent, so apply removes them if set.
   // Signing is the signer service's job here, so the API gets neither raw keys nor KMS key IDs.
   const absent = new Set([
-    "PGLITE_DIR", "DATA_DIR", "PUBLISHER_KEY", "RELAYER_KEY", "FAUCET_SIGNER_KEY",
+    "PGLITE_DIR", "DATA_DIR", "PUBLISHER_KEY", "RELAYER_KEY", "FAUCET_SIGNER_KEY", "WATCH_KEY",
     "KMS_REGION", "KMS_PUBLISHER_KEY_ID", "KMS_RELAYER_KEY_ID", "KMS_FAUCET_SIGNER_KEY_ID",
     "ALLOW_DEV_ATTESTATION", "ALLOW_DEV_VERIFICATION", "ALLOW_DEV_X_LOGIN",
   ]);

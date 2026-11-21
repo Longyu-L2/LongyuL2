@@ -2,6 +2,8 @@
  * What the signer agrees to sign. The API asks; these rules decide.
  * - Publisher: only MiningDistributor.proposeRoot on this chain.
  * - Relayer: only MiningDistributor.claimMany and Faucet.drip on this chain.
+ * - Watch: only MiningDistributor.vetoPendingRoot and MiningDistributor.pause on this chain. The key
+ *   holds the guardian role and nothing else: it can stop a root and stop claims, never move funds.
  * - Faucet signer: only the faucet's Voucher, within the amount, lifetime and daily limits.
  * No key sends value, deploys a contract, signs a message or signs for another chain.
  */
@@ -9,7 +11,7 @@ import { faucetAbi, miningDistributorAbi } from "@longyu/abis";
 import { decodeFunctionData, encodeFunctionData, size, type Abi, type Address, type Hex } from "viem";
 import { z } from "zod";
 
-export type TxRole = "publisher" | "relayer";
+export type TxRole = "publisher" | "relayer" | "watch";
 
 export class PolicyError extends Error {
   constructor(
@@ -83,8 +85,10 @@ export function checkTransaction(role: TxRole, tx: TransactionRequest, limits: L
 
   let call: string;
   if (same(tx.to, limits.distributor)) {
-    call = role === "publisher" ? "proposeRoot" : "claimMany";
-    if (!isCall(miningDistributorAbi as Abi, call, data)) throw new PolicyError("call_not_allowed");
+    const allowed = role === "publisher" ? ["proposeRoot"] : role === "relayer" ? ["claimMany"] : ["vetoPendingRoot", "pause"];
+    const match = allowed.find((name) => isCall(miningDistributorAbi as Abi, name, data));
+    if (!match) throw new PolicyError("call_not_allowed");
+    call = match;
   } else if (role === "relayer" && same(tx.to, limits.faucet)) {
     call = "drip";
     if (!isCall(faucetAbi as Abi, call, data)) throw new PolicyError("call_not_allowed");

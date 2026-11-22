@@ -376,3 +376,19 @@ test("health: before mining day 0 the vault runway says when mining starts, not 
     await env.close();
   }
 });
+
+test("before mining day 0: people sign up, pass the device check and set up a wallet; sessions wait for day 0", async () => {
+  const env = await makeEnv();
+  try {
+    env.clock.t = env.deps.schedule.startTime - 2n * 86_400n;
+    const u = await readyUser(env, "early");
+    assert.ok(u, "sign-up, device check, wallet and verification work before the start");
+    const r = await mine(env, u);
+    assert.equal(r.status, 409, JSON.stringify(r.json));
+    assert.equal((r.json as { code?: string; error?: string }).code ?? (r.json as { error?: string }).error, "session_not_available");
+    env.clock.t = env.deps.schedule.startTime + 60n;
+    assert.equal((await mine(env, u)).status, 200, "mining opens at day 0");
+  } finally {
+    await env.close();
+  }
+});

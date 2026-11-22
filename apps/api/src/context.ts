@@ -87,7 +87,13 @@ export async function loadUser(q: Queryable, userId: string): Promise<UserRow> {
   return rows[0];
 }
 
-export const currentDay = (deps: Deps): bigint => dayOf(deps.schedule, deps.clock.now());
+/**
+ * The mining day now. Before day 0 begins, records (tier changes, bans, wallet changes, flags) are
+ * dated day 0: people can sign up and set up their wallet ahead of the start, while sessions stay
+ * refused until then (checkSessionStart).
+ */
+export const currentDay = (deps: Deps): bigint =>
+  deps.clock.now() < deps.schedule.startTime ? 0n : dayOf(deps.schedule, deps.clock.now());
 
 /**
  * The client's exact address. With ORIGIN_SECRET set, every request has already been checked to

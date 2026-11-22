@@ -25,7 +25,7 @@ const L2_CHAIN_ID = "668801";
 const PUBLIC_RPC_URL = "https://rpc-testnet.longyu.network";
 /** LONGYU Scan behind Cloudflare. */
 const PUBLIC_EXPLORER_URL = "https://scan-testnet.longyu.network";
-/** The landing page: the `web` service's second name, behind Cloudflare. */
+/** The project's website. Since 21 November 2026 the mainnet project serves it; testnet pages link to it. */
 const PUBLIC_SITE_URL = "https://longyu.network";
 /** The pages of the `web` service behind Cloudflare. */
 const PUBLIC_WEB_URL = "https://testnet.longyu.network";

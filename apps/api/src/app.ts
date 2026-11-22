@@ -14,6 +14,7 @@ import { registerPayments } from "./modules/payments.ts";
 import { registerBoosts } from "./modules/boosts.ts";
 import { registerAdminConsole } from "./modules/admin-console.ts";
 import { registerHealth } from "./modules/health.ts";
+import { registerTokenLogos } from "./modules/token-logos.ts";
 
 /**
  * What is logged about a request: Fastify's usual fields, except that the sign-in callback's query
@@ -114,6 +115,7 @@ export async function buildApp(deps: Deps, opts: { logger?: boolean; rateLimit?:
   registerPayments(app, deps);
   registerBoosts(app, deps);
   registerHealth(app, deps);
+  registerTokenLogos(app, deps);
   registerAdminConsole(app);
   return app;
 }

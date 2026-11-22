@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
-import { ApiError, api, saveTokens, setSignedOutHandler } from "./core.web.ts";
+import { ApiError, api, attestDevice, saveTokens, setSignedOutHandler } from "./core.web.ts";
 import { REQUEST_TIMEOUT_MS } from "./request.ts";
 
 // Outside a browser this file keeps the session in memory, which is all these tests need.
@@ -98,4 +98,14 @@ test("only a refused renewal ends the session", async () => {
     await api("GET", "/v1/me");
     assert.equal(next[0]!.authorization, undefined);
   }
+});
+
+test("setup in a browser: with the human check switched off, no check is shown and one challenge is used", async () => {
+  const bodies: unknown[] = [];
+  const calls = remote((c) => c.path === "/v1/device/challenge" ? json(200, { challengeId: "c-1", humanCheck: false }) : json(200, { attested: true }));
+  const sent = globalThis.fetch;
+  globalThis.fetch = (url, init) => { bodies.push(init?.body ? JSON.parse(String(init.body)) : null); return sent(url, init); };
+  await attestDevice();
+  assert.deepEqual(calls.map((c) => c.path), ["/v1/device/challenge", "/v1/device/attest"]);
+  assert.deepEqual(bodies[1], { challengeId: "c-1", token: "skipped" });
 });

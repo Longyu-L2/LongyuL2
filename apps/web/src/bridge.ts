@@ -96,7 +96,12 @@ import {
   type BridgeConfig,
   type RawConfig,
   type StatusView,
+  WITHDRAWAL_STEPS,
+  stepsDone,
 } from "./bridge-core.ts";
+import { formatDisplay } from "./swap-core.ts";
+import { appShell } from "./app-shell.ts";
+import { closedByVisitor, walletSession } from "./wallet-modal.ts";
 import { L1_CHAIN, PROFILE } from "./profile.ts";
 
 declare const __BRIDGE_CONFIG__: RawConfig;
@@ -151,6 +156,7 @@ else closeBridge(parsed.problems);
 
 /** Without a complete, valid configuration the page shows one line and no action works. */
 function closeBridge(problems: string[]): void {
+  appShell();
   $("closed").textContent = "The bridge is unavailable on this address.";
   show("closed", true);
   show("history", false);
@@ -190,6 +196,8 @@ function start(cfg: BridgeConfig): void {
   const amountInput = $("amount") as HTMLInputElement;
   const hashInput = $("hash") as HTMLInputElement;
   const sendButton = $("send") as HTMLButtonElement;
+  const session = walletSession();
+  appShell({ session, connect: () => void run(async () => void (await connect())), explorerUrl: cfg.explorerUrl, chainId: L2_CHAIN_ID, switchChain: () => ensureChain("l2", setStatus) });
 
   let dir: Direction = "deposit";
   let asset: Asset = NATIVE;
@@ -308,15 +316,14 @@ function start(cfg: BridgeConfig): void {
   // ---------------------------------------------------------------- wallet
 
   function provider(): EIP1193Provider {
-    const eth = window.ethereum;
-    if (!eth) throw new Error("No wallet found. Open this page in your wallet's browser (MetaMask, Trust Wallet or Binance Wallet).");
+    // The wallet the visitor picked in the wallet dialog: every request and chain switch goes to it.
+    const eth = session.provider();
+    if (!eth) throw new Error("Connect a wallet first.");
     return eth;
   }
 
   async function connect(): Promise<Address> {
-    const [first] = (await provider().request({ method: "eth_requestAccounts" })) as Address[];
-    if (!first) throw new Error("No account selected in the wallet.");
-    const next = getAddress(first);
+    const next = await session.connect();
     if (next !== account) {
       account = next;
       renderForm();
@@ -619,53 +626,73 @@ function start(cfg: BridgeConfig): void {
     const list = $("list");
     list.replaceChildren();
     show("empty", tracked.length === 0);
+    $("w-count").textContent = tracked.length ? `${tracked.length} tracked` : "";
     for (const hash of tracked) {
       const items = entries.get(hash) ?? [{ index: 0, status: "loading" }];
       for (const entry of items) list.append(itemNode(hash, entry, items.length > 1));
     }
   }
 
+  const SVG = "http://www.w3.org/2000/svg";
+  function cross(): SVGElement {
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("viewBox", "0 0 20 20");
+    svg.setAttribute("aria-hidden", "true");
+    const path = document.createElementNS(SVG, "path");
+    path.setAttribute("d", "m5 5 10 10M15 5 5 15");
+    svg.append(path);
+    return svg;
+  }
+
+  /** One withdrawal: its amount and state, the three steps with the ones done, its links and its next action. */
   function itemNode(hash: Hex, entry: Entry, numbered: boolean): HTMLElement {
     const view: StatusView = entry.status === "loading" ? { label: "Checking…", action: null, tone: "wait" } : statusView(entry.status, { paused });
-    const item = el("div", "item");
+    const item = el("div", "wd");
 
-    const top = el("div", "row");
-    const what = entry.amount != null && entry.asset ? `${formatAmount(entry.amount)} ${entry.asset}` : "Withdrawal";
-    top.append(el("span", "amount num", numbered ? `${what} · ${entry.index + 1}` : what));
-    const remove = el("button", "x", "×");
+    const top = el("div", "wd-top");
+    const what = entry.amount != null && entry.asset ? `${formatDisplay(entry.amount)} ${entry.asset}` : "Withdrawal";
+    top.append(el("span", "wd-amt", numbered ? `${what} · ${entry.index + 1}` : what), el("span", `wd-state ${view.tone}`, view.label));
+    const remove = el("button", "icon-btn");
     remove.type = "button";
     remove.setAttribute("aria-label", "Remove from list");
+    remove.append(cross());
     remove.disabled = busy;
     remove.onclick = () => untrack(hash);
     top.append(remove);
+    item.append(top);
 
-    const state = el("div", "row");
-    let time = "";
-    if (entry.seconds && entry.seconds > 0) time = entry.status === "waiting-to-finalize" ? `${formatDuration(entry.seconds)} left` : `≈ ${formatDuration(entry.seconds)}`;
-    state.append(el("span", view.tone, view.label), el("span", "muted num", time));
+    // Started, proved, finalized: the steps done, and the one it waits for.
+    const done = stepsDone(entry.status);
+    if (done !== null) {
+      const steps = el("ol", `steps${done === WITHDRAWAL_STEPS.length ? " all" : ""}`);
+      steps.setAttribute("aria-label", `${done} of ${WITHDRAWAL_STEPS.length} steps done`);
+      WITHDRAWAL_STEPS.forEach((step, i) => steps.append(el("li", i < done ? "done" : i === done ? "now" : "", step)));
+      item.append(steps);
+    }
 
-    const ref = el("div", "row muted");
+    const meta = el("div", "wd-meta");
     const href = l2TxUrl(cfg.explorerUrl, hash);
-    const link = el(href ? "a" : "span", "num", shortHex(hash));
+    const link = el(href ? "a" : "span", "mono", shortHex(hash));
     link.title = hash;
     if (link instanceof HTMLAnchorElement && href) Object.assign(link, { href, target: "_blank", rel: "noopener noreferrer" });
-    ref.append(link);
+    meta.append(link);
     if (entry.link) {
       const a = el("a", "", entry.link.text);
       if (entry.link.href) Object.assign(a, { href: entry.link.href, target: "_blank", rel: "noopener noreferrer" });
-      ref.append(a);
+      meta.append(a);
     }
-    item.append(top, state, ref);
-
+    if (entry.seconds && entry.seconds > 0) meta.append(el("span", "left", entry.status === "waiting-to-finalize" ? `${formatDuration(entry.seconds)} left` : `≈ ${formatDuration(entry.seconds)}`));
     if (view.action) {
-      const act = el("button", "act", view.action === "prove" ? "Prove on BSC" : "Finalize on BSC");
+      const act = el("button", "btn small", view.action === "prove" ? `Prove on ${PROFILE.l1.short}` : `Finalize on ${PROFILE.l1.short}`);
       act.type = "button";
       act.disabled = busy;
+      if (busy && entry.note) act.setAttribute("aria-busy", "true");
       const action = view.action;
       act.onclick = () => void runItem(hash, entry, action);
-      item.append(act);
+      meta.append(act);
     }
-    item.append(el("div", "muted note", entry.note ?? ""), el("div", "err", entry.error ?? ""));
+    item.append(meta);
+    item.append(el("div", "note", entry.note ?? ""), el("div", "error", entry.error ?? ""));
     return item;
   }
 
@@ -681,7 +708,7 @@ function start(cfg: BridgeConfig): void {
       await (action === "prove" ? prove : finalize)(hash, entry.index, note, entry);
     } catch (e) {
       entry.note = "";
-      entry.error = errorMessage(e);
+      entry.error = closedByVisitor(e) ? "" : errorMessage(e);
     } finally {
       setBusy(false);
       await refreshOne(hash);
@@ -710,7 +737,7 @@ function start(cfg: BridgeConfig): void {
       if (run !== balanceRun) return;
       balance = value;
       reserve = asset === NATIVE ? gasReserve(price) : 0n;
-      $("balance").textContent = `${formatAmount(value)} ${asset}`;
+      $("balance").textContent = `${formatDisplay(value)} ${asset}`;
     } catch {
       if (run === balanceRun) $("balance").textContent = "–";
     }
@@ -722,7 +749,22 @@ function start(cfg: BridgeConfig): void {
     $("asset-bnb").setAttribute("aria-pressed", String(asset === NATIVE));
     $("asset-long").setAttribute("aria-pressed", String(asset === TOKEN));
     $("route").textContent = dir === "deposit" ? `${PROFILE.l1.name} → LONGYU` : `LONGYU → ${PROFILE.l1.name}`;
-    $("eta").textContent = dir === "deposit" ? "≈ 1 min" : wiring ? `≈ ${formatDuration(Number(wiring.interval + wiring.period))}` : "–";
+    // The two networks, the way the funds go.
+    const ends = dir === "deposit" ? (["l1", "l2"] as const) : (["l2", "l1"] as const);
+    // The short name fits the chips at every width; the route line below spells it out.
+    const nameOf = (end: "l1" | "l2") => (end === "l1" ? PROFILE.l1.short : PROFILE.l2.name);
+    $("from-name").textContent = nameOf(ends[0]);
+    $("to-name").textContent = nameOf(ends[1]);
+    $("from-mark").className = `net-mark ${ends[0]}`;
+    $("to-mark").className = `net-mark ${ends[1]}`;
+    // A deposit lands in a minute or so; a withdrawal waits for its state root, is proved, waits again and is finalized.
+    $("eta-label").textContent = dir === "deposit" ? "Time" : "In all";
+    $("eta").textContent = dir === "deposit" ? "1–3 min" : wiring ? `≈ ${formatDuration(Number(wiring.interval + wiring.period))}` : "–";
+    show("prove-row", dir === "withdraw");
+    show("wait-row", dir === "withdraw");
+    $("prove-eta").textContent = wiring ? `≈ ${formatDuration(Number(wiring.interval))}` : "–";
+    $("wait-eta").textContent = wiring ? formatDuration(Number(wiring.period)) : "–";
+    $("gas").textContent = dir === "deposit" ? `On ${PROFILE.l1.short}` : `On LONGYU, then ${PROFILE.l1.short}`;
     show("quick", account !== null);
     show("connect", account === null);
     show("send", account !== null);
@@ -733,6 +775,8 @@ function start(cfg: BridgeConfig): void {
     const verb = dir === "deposit" ? "Deposit" : "Withdraw";
     sendButton.textContent = amount ? `${verb} ${formatAmount(amount)} ${asset}` : verb;
     document.querySelectorAll<HTMLButtonElement | HTMLInputElement>("#bridge button, #bridge input, #history button").forEach((node) => (node.disabled = busy));
+    sendButton.setAttribute("aria-busy", String(busy && account !== null && running));
+    $("connect").setAttribute("aria-busy", String(busy && account === null));
     // Where the mined token does not move yet, its choice stays off.
     if (!cfg.l1Token || !cfg.l2Token) ($("asset-long") as HTMLButtonElement).disabled = true;
   }
@@ -754,8 +798,11 @@ function start(cfg: BridgeConfig): void {
     void refreshBalance();
   }
 
+  /** True while the form's own action runs (not a withdrawal's prove or finalize). */
+  let running = false;
   async function run(task: () => Promise<void>): Promise<void> {
     if (busy) return;
+    running = true;
     setBusy(true);
     $("error").textContent = "";
     setStatus("");
@@ -764,8 +811,10 @@ function start(cfg: BridgeConfig): void {
       await task();
     } catch (e) {
       setStatus("");
-      $("error").textContent = errorMessage(e);
+      // Closing the wallet dialog is not an error.
+      if (!closedByVisitor(e)) $("error").textContent = errorMessage(e);
     } finally {
+      running = false;
       setBusy(false);
       void refreshBalance();
     }
@@ -773,6 +822,10 @@ function start(cfg: BridgeConfig): void {
 
   $("dir-deposit").onclick = () => choose({ dir: "deposit" });
   $("dir-withdraw").onclick = () => choose({ dir: "withdraw" });
+  $("flip-dir").onclick = () => choose({ dir: dir === "deposit" ? "withdraw" : "deposit" });
+  hashInput.onkeydown = (e) => {
+    if (e.key === "Enter") $("add").click();
+  };
   $("asset-bnb").onclick = () => choose({ asset: NATIVE });
   $("asset-long").onclick = () => choose({ asset: TOKEN });
   amountInput.oninput = renderForm;
@@ -810,24 +863,14 @@ function start(cfg: BridgeConfig): void {
     void refreshOne(hash);
   };
 
-  const eth = window.ethereum;
-  if (eth) {
-    eth.on?.("accountsChanged", (accounts: readonly Address[]) => {
-      account = accounts[0] ? getAddress(accounts[0]) : null;
-      renderForm();
-      void refreshBalance();
-    });
-    eth
-      .request({ method: "eth_accounts" })
-      .then((accounts) => {
-        if (accounts[0] && !account) {
-          account = getAddress(accounts[0]);
-          renderForm();
-          void refreshBalance();
-        }
-      })
-      .catch(() => undefined);
-  }
+  // A wallet connected before is used again, and a change of account in it reaches the page.
+  session.onChange(() => {
+    const next = session.account();
+    if (next === account) return;
+    account = next;
+    renderForm();
+    void refreshBalance();
+  });
 
   renderForm();
   renderList();

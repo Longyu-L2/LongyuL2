@@ -26,6 +26,10 @@ export interface Site {
   verification?: boolean;
   /** Lower-case address -> label (predeploys, LONGYU contracts, token symbols). */
   labels: Map<string, string>;
+  /** LONGYU's own tokens, lower-case (OFFICIAL_TOKENS). */
+  official?: string[];
+  /** OFFICIAL_NOTE: shown with the official mark and in imitation warnings. */
+  officialNote?: string | null;
   /** Fingerprint of the static files. It is part of their addresses, so a release never meets an old cached copy. */
   build: string;
 }
@@ -125,6 +129,45 @@ ${home ? html`<section class="hero"><div class="wrap">
 </footer>
 </body>
 </html>`.value}`;
+}
+
+// ------------------------------------------------------- official tokens
+
+/** Letters that look like those of LONG and LONGYU: digits, Cyrillic and Greek capitals, small capitals. */
+const LOOKALIKE: Record<string, string> = {
+  "0": "O", "О": "O", "Ο": "O", "Օ": "O", "1": "L", "|": "L", "Ӏ": "L", "Ꮮ": "L", "ʟ": "L",
+  "Ν": "N", "ɴ": "N", "Ԍ": "G", "ɢ": "G", "У": "Y", "Ү": "Y", "Υ": "Y", "ʏ": "Y", "Ʋ": "U", "Џ": "U", "ᴜ": "U",
+};
+
+/** A name as it reads: compatibility forms folded, capitals, look-alikes replaced, only A to Z kept. */
+export function readsAs(s: string | null): string {
+  return [...(s ?? "").normalize("NFKC").toUpperCase()].map((c) => LOOKALIKE[c] ?? c).join("").replace(/[^A-Z]/g, "");
+}
+
+/** Whether a token's name or symbol passes for LONGYU's: LONG, tLONG, wLONG, or anything with LONGYU in it. */
+export function passesForLongyu(t: { name: string | null; symbol: string | null }): boolean {
+  return [readsAs(t.name), readsAs(t.symbol)].some((x) => ["LONG", "TLONG", "WLONG"].includes(x) || x.includes("LONGYU"));
+}
+
+/** "official" for LONGYU's own tokens, "imitation" for another that passes for one of them, otherwise null. */
+export function standing(site: Site, t: { address: string; name: string | null; symbol: string | null }): "official" | "imitation" | null {
+  if (!site.official?.length) return null;
+  if (site.official.includes(t.address.toLowerCase())) return "official";
+  return passesForLongyu(t) ? "imitation" : null;
+}
+
+/** A token's round logo (served at /logo/<token>: its creator's, LONGYU's mark, BNB's or a monogram). */
+export function tokenLogo(site: Site, address: string, big = false): SafeHtml {
+  const official = site.official?.includes(address.toLowerCase()) ?? false;
+  return html`<img class="${`tlogo${big ? " big" : ""}${official ? " official" : ""}`}" src="${`/logo/${address.toLowerCase()}`}" alt="" width="${big ? 40 : 20}" height="${big ? 40 : 20}" loading="lazy">`;
+}
+
+/** The mark after a token's name in lists. */
+function tokenMark(site: Site, t: { address: string; name: string | null; symbol: string | null }): SafeHtml | string {
+  const s = standing(site, t);
+  if (s === "official") return html` <span class="verified official" title="LONGYU's official token">Official</span>`;
+  if (s === "imitation") return html` <span class="tag warn" title="Uses LONGYU's name; LONGYU did not create it">Not official</span>`;
+  return "";
 }
 
 // --------------------------------------------------------------- pieces
@@ -369,8 +412,14 @@ export function addressPage(
   const label = site.labels.get(a);
   const tabs: [string, string, string][] = [["txs", "Transactions", ""], ["transfers", "Token transfers", ""], ["tokens", `Tokens (${d.holdings.length})`, ""]];
   if (d.contract) tabs.push(["contract", "Contract", d.contract.verified ? "verified" : ""]);
-  return html`<div class="title-row"><h1>${d.isContract ? "Contract" : "Address"}</h1>${label ? html`<span class="pill blue">${label}</span>` : ""}</div>
+  // LONGYU's own token is marked here too, also before its first transfer makes it a listed token.
+  const official = site.official?.includes(a.toLowerCase()) ?? false;
+  const imitation = !official && d.token !== null && standing(site, d.token) === "imitation";
+  const real = site.official?.[0];
+  return html`<div class="title-row"><h1>${d.isContract ? "Contract" : "Address"}</h1>${label ? html`<span class="pill blue">${label}</span>` : ""}${official ? html`<span class="verified official">Official LONGYU token</span>` : ""}</div>
   <p class="mono break lead">${a}${copy(a)}</p>
+  ${official && site.officialNote ? html`<section class="card note">${site.officialNote}</section>` : ""}
+  ${imitation && real ? html`<section class="card warning" role="alert"><strong>Not LONGYU's token.</strong> This token uses LONGYU's name, but LONGYU did not create it. The only official LONG is <a class="mono break" href="${addressPath(real)}">${real}</a>.${site.officialNote ? html` ${site.officialNote}` : ""}</section>` : ""}
   <section class="stats compact">
     <div><span>Balance</span><strong>${d.balance === null ? "–" : formatUnits(d.balance, 18)} <small>${site.native}</small></strong></div>
     <div><span>Transactions</span><strong>${count(d.txCount)}</strong></div>
@@ -378,21 +427,21 @@ export function addressPage(
   </section>
   ${d.creation || d.token ? html`<section class="card">${kv([
     d.creation ? ["Created by", html`${addr(site, d.creation.from_address)} in ${txLink(d.creation.hash)}`] : ["", null],
-    d.token ? ["Token", html`<a href="${tokenPath(d.token.address)}">${d.token.name ?? "Unnamed"} (${d.token.symbol ?? "?"})</a>`] : ["", null],
+    d.token ? ["Token", html`<a href="${tokenPath(d.token.address)}">${d.token.name ?? "Unnamed"} (${d.token.symbol ?? "?"})</a>${tokenMark(site, d.token)}`] : ["", null],
   ])}</section>` : ""}
   <nav class="tabs">${tabs.map(([k, l, mark]) => html`<a href="${`${addressPath(a)}?tab=${k}`}" class="${d.tab === k ? "on" : ""}">${mark ? html`<span class="${mark}">${l}</span>` : l}</a>`)}</nav>
   ${d.tab === "contract" && d.contract ? contractTab(a, d.contract) : ""}
   ${d.tab === "txs" ? html`${txTable(site, d.txs)}${pager(`${addressPath(a)}?tab=txs`, d.page, d.txs.length === PAGE_SIZE)}` : ""}
   ${d.tab === "transfers" ? html`${transferTable(site, d.transfers)}${pager(`${addressPath(a)}?tab=transfers`, d.page, d.transfers.length === PAGE_SIZE)}` : ""}
   ${d.tab === "tokens" ? (d.holdings.length ? html`<div class="table"><table><thead><tr><th>Token</th><th class="r">Balance</th></tr></thead><tbody>
-    ${d.holdings.map((h) => html`<tr><td><a href="${tokenPath(h.token)}">${h.name ?? short(h.token)}</a> <span class="muted">${h.symbol ?? ""}</span></td>
+    ${d.holdings.map((h) => html`<tr><td>${tokenLogo(site, h.token)}<a href="${tokenPath(h.token)}">${h.name ?? short(h.token)}</a> <span class="muted">${h.symbol ?? ""}</span>${tokenMark(site, { address: h.token, name: h.name, symbol: h.symbol })}</td>
     <td class="r num">${h.kind === "erc721" ? h.balance : formatUnits(h.balance, h.decimals)}</td></tr>`)}</tbody></table></div>` : html`<p class="empty">No tokens.</p>`) : ""}`;
 }
 
 export function tokensPage(site: Site, rows: TokenRow[], page: number): SafeHtml {
   return html`<h1>Tokens</h1>
   <div class="table"><table><thead><tr><th>Token</th><th>Type</th><th class="r">Holders</th><th class="r">Transfers</th><th>Contract</th></tr></thead>
-  <tbody>${rows.map((t) => html`<tr><td><a href="${tokenPath(t.address)}"><strong>${t.name ?? "Unnamed"}</strong></a> <span class="muted">${t.symbol ?? ""}</span></td>
+  <tbody>${rows.map((t) => html`<tr><td>${tokenLogo(site, t.address)}<a href="${tokenPath(t.address)}"><strong>${t.name ?? "Unnamed"}</strong></a> <span class="muted">${t.symbol ?? ""}</span>${tokenMark(site, t)}</td>
     <td>${t.kind === "erc721" ? "ERC-721" : "ERC-20"}</td><td class="r num">${count(t.holders)}</td><td class="r num">${count(t.transfers)}</td>
     <td>${addr(site, t.address)}</td></tr>`)}</tbody></table></div>
   ${pager("/tokens", page, rows.length === PAGE_SIZE)}`;
@@ -401,11 +450,16 @@ export function tokensPage(site: Site, rows: TokenRow[], page: number): SafeHtml
 export function tokenPage(
   site: Site,
   t: TokenRow,
-  d: { supply: bigint | null; tab: "transfers" | "holders"; page: number; transfers: TransferRow[]; holders: { holder: string; balance: string }[] },
+  d: { supply: bigint | null; launched?: boolean; tab: "transfers" | "holders"; page: number; transfers: TransferRow[]; holders: { holder: string; balance: string }[] },
 ): SafeHtml {
   const tabs = [["transfers", "Transfers"], ["holders", "Holders"]] as const;
-  return html`<div class="title-row"><h1>${t.name ?? "Unnamed token"}</h1><span class="pill blue">${t.symbol ?? "?"}</span></div>
+  const s = standing(site, t);
+  const real = site.official?.[0];
+  return html`<div class="title-row">${tokenLogo(site, t.address, true)}<h1>${t.name ?? "Unnamed token"}</h1><span class="pill blue">${t.symbol ?? "?"}</span>${s === "official" ? html`<span class="verified official">Official LONGYU token</span>` : ""}</div>
   <p class="mono break lead">${t.address}${copy(t.address)}</p>
+  ${s === "official" && site.officialNote ? html`<section class="card note">${site.officialNote}</section>` : ""}
+  ${s === "imitation" && real ? html`<section class="card warning" role="alert"><strong>Not LONGYU's token.</strong> This token uses LONGYU's name, but LONGYU did not create it. The only official LONG is <a class="mono break" href="${tokenPath(real)}">${real}</a>.${site.officialNote ? html` ${site.officialNote}` : ""}</section>` : ""}
+  ${d.launched && s !== "imitation" ? html`<section class="card note">Made with LONGYU Launch: a fixed supply minted once to its creator. It has no owner, and nobody can mint more or change it.</section>` : ""}
   <section class="stats compact">
     <div><span>Total supply</span><strong class="num">${d.supply === null ? "–" : formatUnits(d.supply, t.kind === "erc721" ? 0 : t.decimals, 2)}</strong></div>
     <div><span>Holders</span><strong>${count(t.holders)}</strong></div>
@@ -458,9 +512,9 @@ export function bridgePage(
   </div>`;
 }
 
-export function searchPage(q: string, tokens: { address: string; name: string | null; symbol: string | null }[]): SafeHtml {
+export function searchPage(q: string, tokens: { address: string; name: string | null; symbol: string | null }[], site?: Site): SafeHtml {
   return html`<h1>Search</h1>
-  ${tokens.length ? html`<ul class="results">${tokens.map((t) => html`<li><a href="${tokenPath(t.address)}"><strong>${t.name ?? "Unnamed"}</strong> <span class="muted">${t.symbol ?? ""}</span></a> <span class="mono muted">${short(t.address, 8, 6)}</span></li>`)}</ul>`
+  ${tokens.length ? html`<ul class="results">${tokens.map((t) => html`<li>${site ? tokenLogo(site, t.address) : ""}<a href="${tokenPath(t.address)}"><strong>${t.name ?? "Unnamed"}</strong> <span class="muted">${t.symbol ?? ""}</span></a>${site ? tokenMark(site, t) : ""} <span class="mono muted">${short(t.address, 8, 6)}</span></li>`)}</ul>`
     : html`<p class="empty">Nothing found for <strong>${q}</strong>.</p>`}`;
 }
 

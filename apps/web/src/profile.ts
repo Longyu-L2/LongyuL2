@@ -31,6 +31,8 @@ export interface Profile {
   token: { name: string; symbol: string };
   /** The bridge moves the mined token; otherwise it moves BNB only (LONG moves after the TGE). */
   bridgeToken: boolean;
+  /** The swap page trades the mined token; otherwise it lists it as not tradable yet (LONG trades after the TGE). */
+  tradeToken: boolean;
   /** The swap page is built. */
   swap: boolean;
 }

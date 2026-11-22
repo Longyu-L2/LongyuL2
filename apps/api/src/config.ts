@@ -73,7 +73,7 @@ export const ConfigSchema = z.object({
    * 20% off for 90. Changing a plan never alters ones already paid for.
    */
   BOOST_PLANS: z.string().default(
-    "c1-7:1000:7:BNB:0.0014,c1-30:1000:30:BNB:0.0054,c1-90:1000:90:BNB:0.0144,c2-7:2500:7:BNB:0.0028,c2-30:2500:30:BNB:0.0108,c2-90:2500:90:BNB:0.0288,c3-7:5000:7:BNB:0.0049,c3-30:5000:30:BNB:0.0189,c3-90:5000:90:BNB:0.0504,c4-7:7500:7:BNB:0.007,c4-30:7500:30:BNB:0.027,c4-90:7500:90:BNB:0.072,c5-7:10000:7:BNB:0.0091,c5-30:10000:30:BNB:0.0351,c5-90:10000:90:BNB:0.0936",
+    "c1-1:1000:1:BNB:0.0014,c1-3:1000:3:BNB:0.0054,c1-7:1000:7:BNB:0.0144,c2-1:2500:1:BNB:0.0028,c2-3:2500:3:BNB:0.0108,c2-7:2500:7:BNB:0.0288,c3-1:5000:1:BNB:0.0049,c3-3:5000:3:BNB:0.0189,c3-7:5000:7:BNB:0.0504,c4-1:7500:1:BNB:0.007,c4-3:7500:3:BNB:0.027,c4-7:7500:7:BNB:0.072,c5-1:10000:1:BNB:0.0091,c5-3:10000:3:BNB:0.0351,c5-7:10000:7:BNB:0.0936",
   ),
   /** Web page where a payer completes an order with their own wallet (?order=<order id>). */
   PAY_PAGE_URL: z.string().url().default("https://testnet.longyu.network/pay.html"),
@@ -83,6 +83,13 @@ export const ConfigSchema = z.object({
   BABT_ADDRESS: address.default("0x2B09d47D550061f995A3b5C6F0Fd58005215D7c8"),
 
   TURNSTILE_SECRET: z.string().optional(),
+  /** LONGYU Launch (TokenLauncher) on LONGYU: the creators of the tokens it made may upload their logos. Unset: no uploads. */
+  TOKEN_LAUNCHER: address.optional(),
+  /**
+   * true: no human check anywhere. Browsers set up and start sessions without one, and phones are
+   * never asked for one. Sign-in with X and the phone's device proof still apply.
+   */
+  HUMAN_CHECK_OFF: bool,
   /**
    * Sign-in with X (OAuth 2.0, confidential client). The redirect URI is this API's own
    * /v1/auth/x/callback, exactly as registered in the X developer app. All three are required in
@@ -335,7 +342,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     }
     if (new URL(config.X_REDIRECT_URI).protocol !== "https:") throw new Error("X_REDIRECT_URI must be https in production");
     if (!config.DATABASE_URL) throw new Error("DATABASE_URL is required in production");
-    if (!config.TURNSTILE_SECRET) throw new Error("TURNSTILE_SECRET is required in production");
+    if (!config.TURNSTILE_SECRET && !config.HUMAN_CHECK_OFF) throw new Error("TURNSTILE_SECRET is required in production (or HUMAN_CHECK_OFF=true)");
     // Data files must outlive any one server: their URLs are written on-chain.
     if (!config.STORAGE_BUCKET) throw new Error("STORAGE_BUCKET is required in production");
     const base = new URL(config.PUBLIC_DATA_BASE_URL);

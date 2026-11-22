@@ -124,6 +124,8 @@
       .fine { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
 
       @media (max-width: 1100px) {
+        /* Eight links and the button still fit in one row down to where the menu takes over. */
+        .top nav { gap: 20px; }
         .net { padding: 8px 24px; }
         .net div { grid-template-columns: 84px minmax(0, 1fr); gap: 12px; }
         .net dd { gap: 12px; }
@@ -196,8 +198,9 @@
         </button>
         <nav id="menu" aria-label="Main">
           <a href="{{MINE_URL}}/">Mine</a>
-          <a href="{{APP_URL}}/bridge.html">Bridge</a>
-          <a href="{{APP_URL}}/swap.html" data-network="testnet">Swap</a>
+          <a href="{{BRIDGE_HREF}}">Bridge</a>
+          <a href="{{SWAP_HREF}}" data-page="swap.html">Swap</a>
+          <a href="{{LAUNCH_HREF}}" data-page="launch.html">Launch</a>
           <a href="{{APP_URL}}/">Claim</a>
           <a href="{{EXPLORER_URL}}/">Explorer</a>
           <a href="./developers" aria-current="page">Developers</a>
@@ -365,10 +368,11 @@ export default defineConfig({
             <div class="stack">
               <h3>LONGYU</h3>
               <dl class="rows">
-                <div data-optional="L2_TOKEN"><dt>{{TOKEN}}</dt><dd><a href="{{EXPLORER_URL}}/address/{{L2_TOKEN}}">{{L2_TOKEN}}</a><button type="button" data-copy="{{L2_TOKEN}}" aria-label="Copy the {{TOKEN}} address">Copy</button></dd></div>
+                <div data-optional="L2_TOKEN"><dt>Official {{TOKEN}}</dt><dd><a href="{{EXPLORER_URL}}/address/{{L2_TOKEN}}">{{L2_TOKEN}}</a><button type="button" data-copy="{{L2_TOKEN}}" aria-label="Copy the official {{TOKEN}} address">Copy</button></dd></div>
                 <div><dt>Wrapped BNB (WBNB)</dt><dd><a href="{{EXPLORER_URL}}/address/0x4200000000000000000000000000000000000006">0x4200000000000000000000000000000000000006</a><button type="button" data-copy="0x4200000000000000000000000000000000000006" aria-label="Copy the WBNB address">Copy</button></dd></div>
-                <div data-network="testnet" data-optional="SWAP_ROUTER"><dt>LONGYU Swap router</dt><dd><a href="{{EXPLORER_URL}}/address/{{SWAP_ROUTER}}">{{SWAP_ROUTER}}</a><button type="button" data-copy="{{SWAP_ROUTER}}" aria-label="Copy the swap router address">Copy</button></dd></div>
-                <div data-network="testnet" data-optional="SWAP_FACTORY"><dt>LONGYU Swap factory</dt><dd><a href="{{EXPLORER_URL}}/address/{{SWAP_FACTORY}}">{{SWAP_FACTORY}}</a><button type="button" data-copy="{{SWAP_FACTORY}}" aria-label="Copy the swap factory address">Copy</button></dd></div>
+                <div data-optional="SWAP_ROUTER"><dt>LONGYU Swap router</dt><dd><a href="{{EXPLORER_URL}}/address/{{SWAP_ROUTER}}">{{SWAP_ROUTER}}</a><button type="button" data-copy="{{SWAP_ROUTER}}" aria-label="Copy the swap router address">Copy</button></dd></div>
+                <div data-optional="SWAP_FACTORY"><dt>LONGYU Swap factory</dt><dd><a href="{{EXPLORER_URL}}/address/{{SWAP_FACTORY}}">{{SWAP_FACTORY}}</a><button type="button" data-copy="{{SWAP_FACTORY}}" aria-label="Copy the swap factory address">Copy</button></dd></div>
+                <div data-optional="TOKEN_LAUNCHER"><dt>LONGYU Launch</dt><dd><a href="{{EXPLORER_URL}}/address/{{TOKEN_LAUNCHER}}">{{TOKEN_LAUNCHER}}</a><button type="button" data-copy="{{TOKEN_LAUNCHER}}" aria-label="Copy the LONGYU Launch address">Copy</button></dd></div>
               </dl>
               <h3>Bridge</h3>
               <dl class="rows">
@@ -399,7 +403,7 @@ export default defineConfig({
           <h2>Tools</h2>
           <div class="cards">
             <a class="card" href="{{EXPLORER_URL}}/verify"><h3>Verify<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Publish a contract's source from the browser.</p></a>
-            <a class="card" href="{{APP_URL}}/bridge.html"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move {{NATIVE}} from {{L1_SHORT}} for gas.</p></a>
+            <a class="card" href="{{BRIDGE_HREF}}"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move {{NATIVE}} from {{L1_SHORT}} for gas.</p></a>
             <a class="card" href="{{EXPLORER_URL}}/"><h3>LONGYU Scan<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Blocks, transactions, tokens and contracts.</p></a>
             <a class="card" href="{{APP_URL}}/safe.html"><h3>Safe<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Sign and send multisig transactions.</p></a>
           </div>
@@ -414,8 +418,14 @@ export default defineConfig({
           <p lang="zh-Hans">龙宇网络</p>
         </div>
         <div class="cols">
-          <div data-network="testnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/swap.html">Swap</a><a href="{{APP_URL}}/">Claim</a></div>
-          <div data-network="mainnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/">Claim</a></div>
+          <div>
+            <h3>Network</h3>
+            <a href="{{MINE_URL}}/">Mine</a>
+            <a href="{{BRIDGE_HREF}}">Bridge</a>
+            <a href="{{SWAP_HREF}}" data-page="swap.html">Swap</a>
+            <a href="{{LAUNCH_HREF}}" data-page="launch.html">Launch</a>
+            <a href="{{APP_URL}}/">Claim</a>
+          </div>
           <div>
             <h3>Developers</h3>
             <a href="{{EXPLORER_URL}}/">Explorer</a>

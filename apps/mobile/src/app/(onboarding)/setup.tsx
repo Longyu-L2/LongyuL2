@@ -16,7 +16,7 @@ import { SignedIn } from "@/components/SignedIn";
  * after signing in with X again; rewards then follow to the new wallet within about two days.
  *
  * A browser has no device to check: it passes a human check instead, here and before every
- * session. It may also mine for a wallet whose key it does not hold (the key stays in the app),
+ * session, unless the API has the check switched off (me.humanCheck false). It may also mine for a wallet whose key it does not hold (the key stays in the app),
  * since rewards are paid to the linked address and claiming needs no key.
  */
 const web = Platform.OS === "web";
@@ -132,9 +132,9 @@ function Setup({ me }: { me: Me }) {
     // New account, or this phone already holds the right key and only the device check is due.
     return (
       <Screen width="column">
-        <Intro title={t("setupTitle")} body={t(web ? "setupBodyWeb" : "setupBody")} />
+        <Intro title={t("setupTitle")} body={t(web ? (me.humanCheck === false ? "setupBodyWebNoCheck" : "setupBodyWeb") : "setupBody")} />
         <List>
-          {web ? (
+          {web && me.humanCheck === false ? null : web ? (
             <Row icon="shield" title={t("humanCheck")} subtitle={t("stepHumanBody")} />
           ) : (
             <Row icon="phone" title={t("stepDeviceTitle")} subtitle={t("stepDeviceBody")} />

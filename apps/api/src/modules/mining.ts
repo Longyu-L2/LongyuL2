@@ -202,7 +202,8 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
     if (!state.ok) throw conflict("session_not_available", `Next session at ${state.nextAllowedAt}`);
     // Decided once per user and day, so asking for new challenges cannot skip the human check.
     // A browser cannot prove its device, so it passes the human check at every session.
-    const pulse = device.platform === "web" || pulseRequired(deps, auth.userId, state.creditedDay);
+    // With HUMAN_CHECK_OFF nobody is asked.
+    const pulse = !deps.config.HUMAN_CHECK_OFF && (device.platform === "web" || pulseRequired(deps, auth.userId, state.creditedDay));
     const c = await createChallenge(deps.db, deps, auth.userId, "session", pulse);
     // The phone's work: the puzzle on this challenge's nonce, and one of the latest state roots on BSC.
     const bits = deps.config.WORK_BITS;
@@ -255,7 +256,7 @@ export function registerMining(app: FastifyInstance, deps: Deps): void {
       await recordAttestationFailure(deps, auth.deviceId);
       throw forbidden("attestation_failed", proof.reason);
     }
-    if ((challenge.pulse_required || device.platform === "web") && !(body.captchaToken && (await deps.captcha.verify(body.captchaToken, clientAddress(deps, req))))) {
+    if (!deps.config.HUMAN_CHECK_OFF && (challenge.pulse_required || device.platform === "web") && !(body.captchaToken && (await deps.captcha.verify(body.captchaToken, clientAddress(deps, req))))) {
       throw forbidden("pulse_failed", "Human check failed");
     }
 

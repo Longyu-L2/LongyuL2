@@ -68,7 +68,8 @@ export function registerDeviceAndWallet(app: FastifyInstance, deps: Deps): void 
     const device = await loadDevice(deps.db, auth.userId, auth.deviceId);
     assertWebMiningOn(deps, device);
     assertDeviceNotLocked(deps, device);
-    return createChallenge(deps.db, deps, auth.userId, "attest");
+    // humanCheck: whether a browser must pass the human check before /v1/device/attest.
+    return { ...(await createChallenge(deps.db, deps, auth.userId, "attest")), humanCheck: !deps.config.HUMAN_CHECK_OFF };
   });
 
   app.post("/v1/device/attest", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (req) => {
@@ -83,7 +84,10 @@ export function registerDeviceAndWallet(app: FastifyInstance, deps: Deps): void 
     const challenge = await consumeChallenge(deps.db, deps, auth.userId, "attest", { id: body.challengeId });
     // The vendor call happens outside any transaction, so it never holds a database connection.
     let result: AttestOutcome;
-    if (device.platform === "web") {
+    if (device.platform === "web" && deps.config.HUMAN_CHECK_OFF) {
+      // The human check is switched off: a signed-in browser is accepted as it is.
+      result = { ok: true };
+    } else if (device.platform === "web") {
       // A browser has no hardware to check: `token` is a human check's token, and no key is kept.
       result = (await deps.captcha.verify(body.token, clientAddress(deps, req))) ? { ok: true } : { ok: false, reason: "human check failed" };
     } else {

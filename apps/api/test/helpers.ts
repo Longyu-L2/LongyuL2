@@ -182,6 +182,11 @@ export class FakeChain implements ChainGateway {
   async isContract(address: Address) {
     return this.contracts.has(address.toLowerCase());
   }
+  /** Tokens LONGYU Launch made: lower-case token address -> creator. */
+  launched = new Map<string, Address>();
+  async launchedTokenCreator(_launcher: Address, token: Address) {
+    return this.launched.get(token.toLowerCase()) ?? null;
+  }
   rewardTokenInfo: RewardToken | null = { address: "0x00000000000000000000000000000000000071c0", name: "LONGYU Testnet Token", symbol: "tLONG", decimals: 18 };
   async rewardToken() {
     return this.rewardTokenInfo;

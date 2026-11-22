@@ -12,7 +12,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "migrate": "tsx src/db/migrate-cli.ts",
-    "test": "node --no-wasm-code-gc --import tsx --test --test-concurrency=1 test/api.test.ts test/jobs.test.ts test/signer.test.ts test/remote-signer.test.ts test/migration.test.ts test/storage.test.ts test/payments.test.ts test/admin.test.ts test/health.test.ts test/sweep.test.ts test/origin.test.ts test/android-attestation.test.ts test/boosts.test.ts test/x-auth.test.ts test/web-mining.test.ts test/invites.test.ts test/phone-work.test.ts",
+    "test": "node --no-wasm-code-gc --import tsx --test --test-concurrency=1 test/api.test.ts test/jobs.test.ts test/signer.test.ts test/remote-signer.test.ts test/migration.test.ts test/storage.test.ts test/payments.test.ts test/admin.test.ts test/health.test.ts test/sweep.test.ts test/origin.test.ts test/android-attestation.test.ts test/boosts.test.ts test/x-auth.test.ts test/web-mining.test.ts test/invites.test.ts test/phone-work.test.ts test/token-logos.test.ts",
     "migration:snapshot": "tsx scripts/migration-snapshot.ts",
     "storage:check": "tsx scripts/storage-check.ts",
     "test:e2e": "node --no-wasm-code-gc --import tsx --test test/e2e.test.ts test/server.test.ts",

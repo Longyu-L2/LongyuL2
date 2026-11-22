@@ -68,6 +68,13 @@ export async function refreshTokenMetadata(db: Db, rpc: Rpc, addresses: string[]
 }
 
 /** Live total supply, or null if the contract does not answer. */
+/** Whether LONGYU Launch made this token (TokenLauncher.launched); null when the launcher cannot be read. */
+export async function launchedBy(rpc: Rpc, launcher: string, token: string): Promise<boolean | null> {
+  const [r] = await rpc.batchSettled<Hex>([read(launcher, `0xd03915b2${token.slice(2).toLowerCase().padStart(64, "0")}`)]);
+  const v = r?.ok ? decodeUintResult(r.value) : null;
+  return v === null ? null : v === 1n;
+}
+
 export async function totalSupply(rpc: Rpc, token: string): Promise<bigint | null> {
   const [r] = await rpc.batchSettled<Hex>([read(token, SELECTORS.totalSupply)]);
   return r?.ok ? decodeUintResult(r.value) : null;

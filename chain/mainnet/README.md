@@ -1,6 +1,6 @@
 # LONGYU mainnet
 
-Not launched. Chain 668800, settling on BSC (chain 56). This folder receives the chain files when the rollup is deployed (`genesis.json`, `rollup.json`, `deploy-config.json`, `l1-deployments.json`, `l2-allocs.json`), exactly as [../testnet](../testnet) did.
+Live since 21 November 2026. Chain 668800, settling on BSC (chain 56). This folder holds the chain files (`genesis.json`, `rollup.json`, `deploy-config.json`, `l1-deployments.json`, `l2-allocs.json`), as [../testnet](../testnet) does.
 
 ## What differs from the testnet
 
@@ -26,12 +26,16 @@ Launched on 21 November 2026 at 17:58:20 UTC, from BSC block 134931142. The gene
 | ProxyAdmin (owned by the timelock above) | BSC | `0x5767D430cbBc422c2B9E6a81390cF56C737B87Ab` |
 | Founders' Safe on LONGYU (the same two of three) | LONGYU | `0x8C0a6E6827BA2bd65D35366ee734cD69f02bF463` |
 | Timelock on LONGYU (2 days, only that Safe proposes and runs): the genesis ProxyAdmin's owner | LONGYU | `0x5767D430cbBc422c2B9E6a81390cF56C737B87Ab` |
-
 | PaymentRouter (capacity plans and partner orders, in BNB or USDT; every payment goes straight to the founders' Safe; admin: the BSC timelock) | BSC | `0x1beA1c0BE9ca54FC4942AC49D3bC634DaAED474C` |
 | LONG (`LongMiningToken`: supply starts at zero, created only by mining within a 3 billion pool, locked until the TGE, unlocks by itself on 19 November 2029 at the latest) | LONGYU | `0xc6D2B2483EC93C15109FCe43d21Ac05919031655` |
 | EmissionSchedule (day 0: 23 November 2026; a ceiling of 8,219,179 LONG a day, 3 billion in all) | LONGYU | `0xbe5322A2149770611B59C037A80cEFE9ea1017Fb` |
 | MintingVault (creates LONG as rewards become claimable) | LONGYU | `0x185eEc50d8D22090575D48bcF416237339c9eD06` |
 | MiningDistributor (daily roots, 12-hour challenge delay; guardians: the founders' Safe, the API's watch key and the watchtower) | LONGYU | `0x39F71d572a8aeE7D2DDF6F94c01f47908304f8d2` |
+| LONGYU Swap factory (`UniswapV2Factory`; the 0.05% protocol share is off, and only the founders' Safe on LONGYU can turn it on) | LONGYU | `0xbCb5dFD7F8FBcB63eF4438E62F3b8456F08Ee693` |
+| LONGYU Swap router (`UniswapV2Router02`, BNB through WBNB `0x4200…0006`; 0.3% per trade to liquidity providers) | LONGYU | `0x39232e1F40a70e1B9d6c78945a5Bc0aE769646B5` |
+| LONGYU Launch (`TokenLauncher`: anyone launches a fixed-supply token with no owner, free of charge; names that pass for LONG or LONGYU are refused; no owner, no settings) | LONGYU | `0x0F6f17ABD46463F2B431104e1895bBE6AA91d7BF` |
+
+LONGYU Swap and LONGYU Launch were deployed on 22 November 2026 by another key used only on LONGYU (`0xe1a98d26456D9Dc6B343DD3c735d4f82f579711C`); all three are verified on the explorer.
 
 The mining contracts were deployed by a key used for nothing else (`0xC436309c1bff4ED19bdC0b83bec399c06B45e990`), so their addresses exist on no other chain; it must never send a transaction on BSC. Their admin is the LONGYU timelock; that key holds no role.
 

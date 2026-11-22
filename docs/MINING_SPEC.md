@@ -52,7 +52,7 @@ The budget is a ceiling, not an amount shared out. While the weights of everyone
 | T2 | Verifying identity: one person, one account |
 | T3 | Verified, 60 or more mining days, and never held by a risk rule |
 
-On testnet, mining does not wait for an identity check: T1 earns the full rate, straight into its entitlement. The check is asked for before mainnet conversion, and the migration snapshot counts verified accounts only. What stands between one person and many accounts until then is the X sign-in, the device or human check and the risk rules below. The daily budget E_d is fixed either way, so extra accounts take a larger share of it and cannot enlarge it.
+On testnet, mining does not wait for an identity check: T1 earns the full rate, straight into its entitlement. The check is asked for before mainnet conversion, and the migration snapshot counts verified accounts only. What stands between one person and many accounts until then is the X sign-in, the device or human check and the risk rules below. The daily budget E_d is a ceiling either way: extra accounts cannot enlarge it, and only on a day the weights pass it is every reward scaled down alike.
 
 The engine also carries a gated parameter set (`VERIFICATION_GATED_PARAMS`: T1 = 0.5, held off-chain until the account verifies). It is not in use.
 
@@ -77,7 +77,7 @@ Migration to mainnet counts mined tLONG pro rata, so boosted mining earns a larg
 
 ## Invite bonus
 
-An account that signed up with another account's invite code adds to that account's `n` on each day it counts: +5% each, at most +25% (five counted invites). The bonus is the inviter's alone, and it applies only on a day the inviter mines, because it multiplies their own weight. The daily budget does not change: a bonus raises a miner's share of it.
+An account that signed up with another account's invite code adds to that account's `n` on each day it counts: +5% each, at most +25% (five counted invites). The bonus is the inviter's alone, and it applies only on a day the inviter mines, because it multiplies their own weight. The daily budget does not change: a bonus raises the inviter's weight, and takes from others only on a day the total passes the budget.
 
 An invited account counts on a mining day when all of this holds:
 

@@ -224,6 +224,46 @@ test("web mining: a phone still has to prove its device at every session", async
   }
 });
 
+test("human check switched off: browsers set up and mine without it, and phones are never asked", async () => {
+  const env = await makeEnv({ env: { ...ON, HUMAN_CHECK_OFF: "true" } });
+  try {
+    const u = await webUser(env, "wei");
+    assert.equal((await call<{ humanCheck: boolean }>(env, "GET", "/v1/me", undefined, auth(u))).json.humanCheck, false);
+    const c = await call<{ humanCheck: boolean }>(env, "POST", "/v1/device/challenge", {}, auth(u));
+    assert.equal(c.json.humanCheck, false);
+    assert.deepEqual((await webCheck(env, u, "skipped")).json, { attested: true });
+    assert.equal((await call<{ tier: number }>(env, "GET", "/v1/me", undefined, auth(u))).json.tier, 1);
+    assert.equal((await linkWallet(env, u)).status, 200);
+    const r = await webMine(env, u, {});
+    assert.equal(r.pulseRequired, false);
+    assert.equal(r.status, 200, JSON.stringify(r.json));
+
+    // A phone still proves its device, and is never asked for the human check on any day.
+    const p = await signUp(env, "lin");
+    await attest(env, p);
+    await linkWallet(env, p);
+    for (let day = 0n; day < 40n; day++) {
+      env.clock.at(day, 3600n);
+      const ch = await call<{ pulseRequired: boolean }>(env, "POST", "/v1/mining/challenge", {}, auth(p));
+      if (ch.status === 200) assert.equal(ch.json.pulseRequired, false, `day ${day}`);
+    }
+  } finally {
+    await env.close();
+  }
+});
+
+test("human check on (the default): /v1/me and the device challenge say so", async () => {
+  const env = await makeEnv({ env: ON });
+  try {
+    const u = await webUser(env, "wei");
+    assert.equal((await call<{ humanCheck: boolean }>(env, "GET", "/v1/me", undefined, auth(u))).json.humanCheck, true);
+    assert.equal((await call<{ humanCheck: boolean }>(env, "POST", "/v1/device/challenge", {}, auth(u))).json.humanCheck, true);
+    assert.deepEqual((await webCheck(env, u, "skipped")).json, { attested: false, reason: "human check failed" });
+  } finally {
+    await env.close();
+  }
+});
+
 // ------------------------------------------------------------------- switch
 
 test("web mining switched off: no web sign-in, and the phone app is untouched", async () => {

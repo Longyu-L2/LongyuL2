@@ -352,6 +352,8 @@ export function registerAuth(app: FastifyInstance, deps: Deps): void {
       // False once the attestation is older than 30 days: the app then re-attests.
       deviceAttested: attestationExpiresAt !== null && attestationExpiresAt > deps.clock.now(),
       attestationExpiresAt,
+      // Whether browsers are asked for the human check (the app's setup screen says so or not).
+      humanCheck: !deps.config.HUMAN_CHECK_OFF,
     };
   });
 }

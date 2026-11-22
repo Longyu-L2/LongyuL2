@@ -67,16 +67,16 @@ test("boost plans: parsed strictly, and priced in an accepted payment token", ()
   assert.throws(() => loadConfig({ ...base, BOOST_PLANS: "x1:5000:30:DOGE:9" }), /not in PAYMENT_TOKENS/);
 });
 
-test("default capacity plans: five classes by three epochs, in BNB, longer epochs cheaper per day", () => {
+test("default capacity plans: five classes by epochs of 1, 3 and 7 days, in BNB, at the founders' prices", () => {
   const plans = parseBoostPlans(ConfigSchema.shape.BOOST_PLANS.parse(undefined));
   assert.equal(plans.length, 15);
-  assert.ok(plans.every((p) => p.token === "BNB" && /^c[1-5]-(7|30|90)$/.test(p.id)));
+  assert.ok(plans.every((p) => p.token === "BNB" && /^c[1-5]-(1|3|7)$/.test(p.id) && p.id.endsWith(`-${p.days}`)));
   assert.deepEqual([...new Set(plans.map((p) => p.boostBps))], [1000, 2500, 5000, 7500, 10000]);
   for (const cls of ["c1", "c2", "c3", "c4", "c5"]) {
-    const perDay = (d: number) => Number(plans.find((p) => p.id === `${cls}-${d}`)!.price) / d;
-    assert.ok(perDay(90) < perDay(30) && perDay(30) < perDay(7), cls);
+    const price = (d: number) => Number(plans.find((p) => p.id === `${cls}-${d}`)!.price);
+    assert.ok(price(1) < price(3) && price(3) < price(7), cls);
   }
-  assert.equal(plans.find((p) => p.id === "c3-30")!.price, "0.0189");
+  assert.deepEqual(["c1-1", "c3-3", "c5-7"].map((id) => plans.find((p) => p.id === id)!.price), ["0.0014", "0.0189", "0.0936"]);
 });
 
 test("capacity is for accounts earning into their entitlement: every checked miner on testnet", async () => {

@@ -13,7 +13,52 @@ LONGYU is a Layer 2 network that settles on BNB Smart Chain. Gas is paid in BNB 
 
 This repository is the whole network in one place: the chain configuration, the mining contracts, the reward engine, the backend, the block explorer, the bridge and swap pages, and LONGYU MINE, the app people mine with.
 
-The network is on public testnet. The contracts have not had an external audit; how they are reviewed is in [SECURITY.md](SECURITY.md).
+LONGYU mainnet has been live since 21 November 2026. The public testnet keeps running beside it for testing. The contracts have not had an external audit; how they are reviewed is in [SECURITY.md](SECURITY.md).
+
+## Mainnet
+
+| | |
+|---|---|
+| Website | https://longyu.network |
+| Chain ID | `668800` |
+| Settles on | BNB Smart Chain (chain 56) |
+| Gas token | BNB, bridged from BSC |
+| RPC | https://rpc.longyu.network |
+| Explorer | https://scan.longyu.network |
+| Bridge | https://bridge.longyu.network |
+| Swap | https://dex.longyu.network |
+| Launch a token | https://dex.longyu.network/launch |
+| LONGYU MINE | https://mine.longyu.network |
+| Developers | https://longyu.network/developers |
+
+LONG is created only by mining and is locked until the TGE: nobody can move it, pool it or trade it before then.
+
+Contracts on LONGYU mainnet:
+
+| Contract | Address |
+|---|---|
+| LONG (`LongMiningToken`) | `0xc6D2B2483EC93C15109FCe43d21Ac05919031655` |
+| MintingVault | `0x185eEc50d8D22090575D48bcF416237339c9eD06` |
+| MiningDistributor | `0x39F71d572a8aeE7D2DDF6F94c01f47908304f8d2` |
+| EmissionSchedule | `0xbe5322A2149770611B59C037A80cEFE9ea1017Fb` |
+| Swap factory | `0xbCb5dFD7F8FBcB63eF4438E62F3b8456F08Ee693` |
+| Swap router | `0x39232e1F40a70e1B9d6c78945a5Bc0aE769646B5` |
+| TokenLauncher | `0x0F6f17ABD46463F2B431104e1895bBE6AA91d7BF` |
+| Founders' Safe (2 of 3) | `0x8C0a6E6827BA2bd65D35366ee734cD69f02bF463` |
+| Timelock (2 days) | `0x5767D430cbBc422c2B9E6a81390cF56C737B87Ab` |
+
+Contracts on BNB Smart Chain:
+
+| Contract | Address |
+|---|---|
+| Founders' Safe (2 of 3): treasury, system owner, guardian | `0x426Ff9521BfA16A413162eeE550CB6560Ba41074` |
+| Timelock (2 days): upgrade rights | `0x590415ECB7cd1784E56E2c3af9e3D9e0dEB3E722` |
+| OptimismPortal (proxy) | `0x09BD641f8A55cDC49851f828cb392134c9aE35eb` |
+| L1StandardBridge (proxy) | `0xA44A484bfDBfB97951A172fC798389Dd37599a5a` |
+| L2OutputOracle (proxy) | `0x77fF9CDD8B92869D428956695dE0e2d94a75aDC8` |
+| PaymentRouter | `0x1beA1c0BE9ca54FC4942AC49D3bC634DaAED474C` |
+
+Every address, the launch record and what differs from the testnet: [chain/mainnet/README.md](chain/mainnet/README.md). The rollup contracts: [chain/mainnet/l1-deployments.json](chain/mainnet/l1-deployments.json).
 
 ## Testnet
 
@@ -216,7 +261,7 @@ The explorer needs no API key. There is also a form at https://scan-testnet.long
 
 Report vulnerabilities privately, as described in [SECURITY.md](SECURITY.md).
 
-What is tested today: the contracts have unit, fuzz and invariant suites; roots built by the TypeScript engine are claimed leaf by leaf against the real contract; the backend runs end to end against the contracts on a local chain. What is not done: an external audit. The project does not plan one; the review before mainnet is described in [SECURITY.md](SECURITY.md).
+What is tested today: the contracts have unit, fuzz and invariant suites; roots built by the TypeScript engine are claimed leaf by leaf against the real contract; the backend runs end to end against the contracts on a local chain. What is not done: an external audit. The project does not plan one; how the contracts were reviewed is described in [SECURITY.md](SECURITY.md).
 
 ## Contributing
 

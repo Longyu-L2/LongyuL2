@@ -22,7 +22,7 @@ Out of scope: denial of service by volume, findings that need a rooted or modifi
 
 ## Status
 
-The network is on testnet. The contracts have unit, fuzz and invariant tests and an internal review. They have not had an external audit, and the project does not plan one.
+Mainnet (chain 668800 on BNB Smart Chain) has been live since 21 November 2026; the testnet (chain 668801 on BSC testnet) runs beside it. The contracts have unit, fuzz and invariant tests, an internal review and review passes by reviewers that did not write them, whose findings were fixed before launch. They have not had an external audit, and the project does not plan one.
 
 ## Design limits worth knowing
 
@@ -37,7 +37,7 @@ These hold even if a backend key is stolen:
 - The API holds no signing keys. A separate private service signs, and only the specific calls it is built for.
 - A payment counts for an order only if it is the order's exact token and amount. The router derives the order ID from the reference, the token and the amount.
 
-Known limits of the testnet deployment, to be closed before mainnet:
+Known limits of the testnet (mainnet's are below):
 
 - One testnet admin key holds every privileged role: the rollup's upgrade rights on BSC (through SystemOwnerSafe, a Safe with that key as its only signer), the L2 ProxyAdmin (`0x4200000000000000000000000000000000000018`), the system config, the admin and guardian roles of the mining contracts, the swap factory's fee setter, and the tLONG on BSC testnet that has not been bridged. Mainnet moves each of them to a multisig, the upgrade and admin roles behind a timelock.
 - The growth limit bounds a root's total, not who it pays. A stolen publisher key could propose a root that hands everything entitled and not yet claimed to other accounts, within the bound per account. The challenge delay and the guardian's veto are the defence, and the API's health check reports any root on chain that it did not compute.
@@ -48,12 +48,20 @@ Known limits of the testnet deployment, to be closed before mainnet:
 - Mining on testnet does not wait for an identity check, so one person with several X accounts and devices can mine with each. That dilutes other miners' share of the fixed daily budget and cannot enlarge it. Mainnet conversion counts verified accounts only.
 - `MiningDistributor.claimMany` with the native asset would revert as a batch if one recipient refused the transfer. The deployed distributor pays an ERC-20, where this cannot happen.
 
-## Before mainnet
+## Mainnet
 
-- A review of the mining contracts, the faucet, the payment router, the two swap patches and the challenger by reviewers that did not write them, with static analysis and longer fuzz and invariant runs. Findings and their fixes are published.
-- Limits on what is at risk in the first weeks, raised as the network runs without incident.
-- Multisigs for every role above, with a timelock on upgrades and admin settings, and the handover checked on chain. The scripts are ready and rehearsed on a fork of BSC (`chain/mainnet/rehearse.sh`): the founders' Safe owns the system config and holds the pause from the first block, and the upgrade rights move to a two-day timelock that only it can use.
-- A one-hour withdrawal wait, with the watchtower's challenger running from the first block on its own infrastructure, so its node never has history to catch up on. A wait that short is only as safe as that challenger, so it is part of the review.
-- The watchtower's pause and veto also sent as deposits through BSC, so a sequencer cannot refuse them.
-- Identity verification before any conversion to LONG.
-- The sequencer, batcher and proposer keys in hardware or a key service, and a second L1 RPC provider.
+In place since launch on 21 November 2026, each checked on chain:
+
+- The founders' Safe (two of three signers) owns the system config, holds the pause and receives every fee and payment, from the first block. The upgrade rights on BSC and on LONGYU sit behind two-day timelocks that only that Safe can use; the deploying keys hold no role.
+- LONG has no supply until mining creates it, within a fixed pool, and cannot be moved, approved or pooled before the TGE (or a latest unlock date fixed in the token).
+- Withdrawals to BSC wait one hour, with the watchtower's challenger and its own node running from the first block on infrastructure separate from the chain's.
+- The mining contracts, the watchtower and the LONG token were reviewed by reviewers that did not write them; every finding was fixed before deployment.
+
+Known limits of mainnet:
+
+- The sequencer, batcher, proposer and publisher keys are hot keys held by the services that use them, not yet in hardware or a key service.
+- The watchtower's pause and veto go to the sequencer through the public RPC; sending them also as deposits through BSC, so a sequencer cannot refuse them, is the next step.
+- A one-hour withdrawal wait is only as safe as the challenger watching it.
+- The mining-root limits above (the growth bound, the API's own watch) apply on mainnet as on testnet.
+- LONGYU Swap and LONGYU Launch are open to anyone: tokens made by others are theirs, not LONGYU's. Pages and the explorer mark the official LONG and warn on look-alikes.
+- Identity verification before the TGE.

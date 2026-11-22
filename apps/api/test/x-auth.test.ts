@@ -741,6 +741,12 @@ test("settings: production refuses to start without X, with a non-https callback
   assert.ok(!(xProvider(ok) instanceof DevX));
   assert.notEqual(xProvider(ok), noX);
 
+  // The human check: its secret is required, unless the check is switched off.
+  const { TURNSTILE_SECRET: _t, ...noCheck } = { ...PROD, ...X };
+  assert.throws(() => loadConfig(noCheck), /TURNSTILE_SECRET is required in production/);
+  assert.equal(loadConfig({ ...noCheck, HUMAN_CHECK_OFF: "true" }).HUMAN_CHECK_OFF, true);
+  assert.equal(ok.HUMAN_CHECK_OFF, false);
+
   assert.throws(() => loadConfig(PROD), /X_CLIENT_ID, X_CLIENT_SECRET and X_REDIRECT_URI are required in production/);
   assert.throws(() => loadConfig({ ...PROD, X_REDIRECT_URI: X.X_REDIRECT_URI }), /required in production/);
   assert.throws(() => loadConfig({ ...PROD, ...X, X_CLIENT_ID: "" }), /set together/);

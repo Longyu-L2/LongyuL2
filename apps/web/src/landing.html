@@ -114,6 +114,8 @@
       .card h3 svg { width: 20px; height: 20px; fill: none; stroke: var(--blue); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.15s; }
       .card:hover h3 svg { transform: translate(2px, -2px); }
       .card p { margin-top: auto; padding-top: 20px; color: var(--soft); font-size: 16px; }
+      /* A last card on its own spans the row, so the grid stays even whichever pages are built. */
+      .cards > .card:last-child:nth-child(odd) { grid-column: 1 / -1; }
 
       .build { padding: 104px 0; background: var(--card); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
       .build .wrap { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); align-items: center; gap: 56px; }
@@ -141,9 +143,12 @@
       .cols h3 { margin-bottom: 8px; font-weight: 600; font-size: 14px; }
       .cols a { display: block; padding: 7px 0; color: var(--soft); font-size: 15px; }
       .cols a:hover { color: var(--blue); }
-      .fine { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; }
+      .fine { grid-column: 1 / -1; padding-top: 24px; border-top: 1px solid var(--line); color: var(--faint); font-size: 13px; overflow-wrap: anywhere; }
+      .fine + .fine { padding-top: 0; border-top: 0; }
 
       @media (max-width: 1100px) {
+        /* Eight links and the button still fit in one row down to where the menu takes over. */
+        .top nav { gap: 20px; }
         .net { padding: 8px 24px; }
         .net div { grid-template-columns: 84px minmax(0, 1fr); gap: 12px; }
         .net dd { gap: 12px; }
@@ -212,8 +217,9 @@
         </button>
         <nav id="menu" aria-label="Main">
           <a href="{{MINE_URL}}/">Mine</a>
-          <a href="{{APP_URL}}/bridge.html">Bridge</a>
-          <a href="{{APP_URL}}/swap.html" data-network="testnet">Swap</a>
+          <a href="{{BRIDGE_HREF}}">Bridge</a>
+          <a href="{{SWAP_HREF}}" data-page="swap.html">Swap</a>
+          <a href="{{LAUNCH_HREF}}" data-page="launch.html">Launch</a>
           <a href="{{APP_URL}}/">Claim</a>
           <a href="{{EXPLORER_URL}}/">Explorer</a>
           <a href="./developers">Developers</a>
@@ -273,12 +279,13 @@
               </div>
             </div>
             <div class="cards">
-              <a class="card" href="{{APP_URL}}/bridge.html" data-network="testnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB and {{TOKEN}} between BSC and LONGYU.</p></a>
-              <a class="card" href="{{APP_URL}}/bridge.html" data-network="mainnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB between BSC and LONGYU.</p></a>
-              <a class="card" href="{{APP_URL}}/swap.html" data-network="testnet"><h3>Swap<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Trade and provide liquidity on LONGYU Swap.</p></a>
-              <a class="card" href="./developers" data-network="mainnet"><h3>Developers<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Network details, deploy and verify.</p></a>
+              <a class="card" href="{{BRIDGE_HREF}}" data-network="testnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB and {{TOKEN}} between BSC and LONGYU.</p></a>
+              <a class="card" href="{{BRIDGE_HREF}}" data-network="mainnet"><h3>Bridge<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Move BNB between BSC and LONGYU.</p></a>
+              <a class="card" href="{{SWAP_HREF}}" data-page="swap.html"><h3>Swap<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Trade tokens against BNB and provide liquidity on LONGYU Swap.</p></a>
+              <a class="card" href="{{LAUNCH_HREF}}" data-page="launch.html"><h3>Launch<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Launch a fixed-supply token for your project. Gas only.</p></a>
               <a class="card" href="{{APP_URL}}/"><h3>Claim<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Claim mined rewards straight from the contract.</p></a>
               <a class="card" href="{{EXPLORER_URL}}/"><h3>LONGYU Scan<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Blocks, transactions, tokens and contracts.</p></a>
+              <a class="card" href="./developers"><h3>Developers<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M7 5h8v8" /></svg></h3><p>Network details, deploy and verify.</p></a>
             </div>
           </div>
         </div>
@@ -301,6 +308,7 @@
             <div><dt>Chain ID</dt><dd><span>{{CHAIN_ID}}</span><button type="button" data-copy="{{CHAIN_ID}}" aria-label="Copy the chain ID">Copy</button></dd></div>
             <div><dt>Currency</dt><dd><span>{{NATIVE_SYMBOL}}</span><button type="button" data-copy="{{NATIVE_SYMBOL}}" aria-label="Copy the currency symbol">Copy</button></dd></div>
             <div><dt>Explorer</dt><dd><span>{{EXPLORER_URL}}</span><button type="button" data-copy="{{EXPLORER_URL}}" aria-label="Copy the explorer address">Copy</button></dd></div>
+            <div data-optional="L2_TOKEN"><dt>Official {{TOKEN}}</dt><dd><span>{{L2_TOKEN}}</span><button type="button" data-copy="{{L2_TOKEN}}" aria-label="Copy the official {{TOKEN}} address">Copy</button></dd></div>
           </dl>
         </div>
       </section>
@@ -323,8 +331,14 @@
           <p lang="zh-Hans">龙宇网络</p>
         </div>
         <div class="cols">
-          <div data-network="testnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/swap.html">Swap</a><a href="{{APP_URL}}/">Claim</a></div>
-          <div data-network="mainnet"><h3>Network</h3><a href="{{MINE_URL}}/">Mine</a><a href="{{APP_URL}}/bridge.html">Bridge</a><a href="{{APP_URL}}/">Claim</a></div>
+          <div>
+            <h3>Network</h3>
+            <a href="{{MINE_URL}}/">Mine</a>
+            <a href="{{BRIDGE_HREF}}">Bridge</a>
+            <a href="{{SWAP_HREF}}" data-page="swap.html">Swap</a>
+            <a href="{{LAUNCH_HREF}}" data-page="launch.html">Launch</a>
+            <a href="{{APP_URL}}/">Claim</a>
+          </div>
           <div>
             <h3>Developers</h3>
             <a href="{{EXPLORER_URL}}/">Explorer</a>
@@ -335,6 +349,7 @@
         </div>
         <p class="fine" data-network="testnet">Testnet. tLONG on testnet has no monetary value.</p>
         <p class="fine" data-network="mainnet">Mined {{TOKEN}} is locked in wallets until the TGE.</p>
+        <p class="fine" data-network="mainnet" data-optional="L2_TOKEN">The only official {{TOKEN}} is {{L2_TOKEN}}. Any other token called {{TOKEN}} or LONGYU was not made by LONGYU.</p>
       </div>
     </footer>
     <script type="module" src="./landing.js"></script>

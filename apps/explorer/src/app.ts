@@ -17,7 +17,8 @@ import { bridgedToken, decodeCall, decodeLog, methodName, PREDEPLOYS } from "./d
 import { isSystemTx } from "./indexer.ts";
 import * as Q from "./queries.ts";
 import { hex, type Hex, type RawBlock, type RawReceipt, type RawTx, type Rpc } from "./rpc.ts";
-import { cleanText, totalSupply } from "./tokens.ts";
+import { cleanText, launchedBy, totalSupply } from "./tokens.ts";
+import { logoReader, monogramSvg, WBNB } from "./logos.ts";
 import { isolatedCompiler, LIMITS, type Compile } from "./verify/compile.ts";
 import { CompilerStore, type CompilerBuild } from "./verify/compilers.ts";
 import { Verifier } from "./verify/service.ts";
@@ -29,6 +30,8 @@ export interface AppDeps {
   db: Db;
   rpc: Rpc;
   config: Config;
+  /** A stand-in for the requests to TOKEN_LOGO_API, for tests. */
+  fetchLogo?: typeof fetch;
   /** Stand-ins for the compiler and its download, for tests. */
   verify?: { compile?: Compile; loadCompiler?: (build: CompilerBuild) => Promise<Buffer> };
 }
@@ -82,6 +85,8 @@ export function siteOf(config: Config, build = ""): Site {
     developersUrl: config.DEVELOPERS_URL ?? null,
     githubUrl: config.GITHUB_URL ?? null,
     verification: config.VERIFICATION,
+    officialNote: config.OFFICIAL_NOTE.trim() || null,
+    official: config.OFFICIAL_TOKENS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
     labels,
     build,
   };
@@ -350,6 +355,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     const keep = current ? "public, max-age=31536000, immutable" : name.startsWith("fonts/") ? "public, max-age=604800" : "public, max-age=300";
     return reply.header("cache-control", keep).type(f.type).send(f.body);
   });
+  // ---------------------------------------------------------------- token logos
+  const readLogo = logoReader(config.TOKEN_LOGO_API, deps.fetchLogo);
+  app.get("/logo/:address", async (req, reply) => {
+    const a = normAddress((req.params as { address: string }).address);
+    if (!a) return reply.code(404).send("Not found");
+    reply.header("cache-control", "public, max-age=300").header("content-security-policy", "default-src 'none'");
+    if (site.official?.includes(a)) return reply.redirect(`/static/mark.svg?v=${site.build}`);
+    if (a === WBNB) return reply.redirect(`/static/bnb.png?v=${site.build}`);
+    const logo = (await readLogo(a)) ?? monogramSvg((await Q.token(db, a))?.symbol ?? null);
+    return reply.type(logo.type).send(logo.body);
+  });
   app.get("/favicon.ico", async (_req, reply) => reply.redirect("/static/favicon.svg", 301));
   app.get("/robots.txt", async (_req, reply) => reply.type("text/plain").send("User-agent: *\nAllow: /\nDisallow: /api\n"));
 
@@ -457,12 +473,13 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (!t) return a ? reply.redirect(addressPath(a)) : notFound(reply, "That is not a token address.");
     const tab = (req.query as { tab?: string }).tab === "holders" ? "holders" : "transfers";
     const p = pageOf(req.query);
-    const [supply, transfers, holders] = await Promise.all([
+    const [supply, launched, transfers, holders] = await Promise.all([
       totalSupply(rpc, t.address).catch(() => null),
+      config.TOKEN_LAUNCHER ? launchedBy(rpc, config.TOKEN_LAUNCHER, t.address).catch(() => null) : null,
       tab === "transfers" ? Q.tokenTransfers(db, t.address, PAGE_SIZE, (p - 1) * PAGE_SIZE) : [],
       tab === "holders" ? Q.tokenHolders(db, t.address, PAGE_SIZE, (p - 1) * PAGE_SIZE) : [],
     ]);
-    return page(reply, `${t.name ?? "Token"} (${t.symbol ?? "?"})`, tokenPage(site, t, { supply, tab, page: p, transfers, holders }), "/tokens");
+    return page(reply, `${t.name ?? "Token"} (${t.symbol ?? "?"})`, tokenPage(site, t, { supply, launched: launched === true, tab, page: p, transfers, holders }), "/tokens");
   });
 
   app.get("/bridge", async (_req, reply) => {
@@ -492,7 +509,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     if (a) return reply.redirect((await Q.token(db, a)) ? tokenPath(a) : addressPath(a));
     const found = await Q.searchTokens(db, q);
     if (found.length === 1) return reply.redirect(tokenPath(found[0]!.address));
-    return page(reply, "Search", searchPage(q, found));
+    return page(reply, "Search", searchPage(q, found, site));
   });
 
   app.get("/api-docs", async (_req, reply) => page(reply, "API", apiDocsPage(site), "/api-docs"));

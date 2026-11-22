@@ -70,6 +70,7 @@ export const en = {
   humanCheckFailed: "The human check could not load. Check your connection, turn off any content blocker for this site, and try again.",
   // browser
   setupBodyWeb: "A quick human check, and a wallet only you control.",
+  setupBodyWebNoCheck: "A wallet only you control.",
   stepHumanBody: "Asked again before each session",
   stepWalletBodyWeb: "Key stays in this browser",
   webKeyNotice: "Your wallet key is stored only in this browser. Clearing the browser's data, or private browsing, deletes it. Save a copy: Wallet, then Export private key.",
@@ -129,11 +130,9 @@ export const en = {
   capacityTooManyOpen: "Complete or let an open payment expire first.",
   capacityQueueFull: "Plans are scheduled a full year ahead.",
   capacityClass: "Class",
-  projectedRate: "Projected rate",
-  perEpoch: "Extra over the epoch",
+  capacityRate: "Capacity",
   cost: "Cost",
   allocate: "Activate {plan}",
-  estimateNote: "Estimated at today's network size. Final amounts are set at each daily settlement.",
   capacityDisclosure: MAINNET
     ? "Paid in BNB on BNB Smart Chain from your own wallet. LONG comes only from mining and stays locked until the TGE."
     : "Paid in BNB on BNB Smart Chain from your own wallet. Testnet tLONG has no monetary value.",
@@ -283,6 +282,7 @@ export const zhHans: Record<StringKey, string> = {
   humanCheckFailed: "真人验证无法加载。请检查网络，并对本站关闭内容拦截器后重试。",
   // browser
   setupBodyWeb: "一次快速真人验证，以及只有你能掌控的钱包。",
+  setupBodyWebNoCheck: "一个只有你能掌控的钱包。",
   stepHumanBody: "每次挖矿前都会再验证一次",
   stepWalletBodyWeb: "私钥只保存在此浏览器",
   webKeyNotice: "钱包私钥只保存在此浏览器中。清除浏览器数据或使用无痕模式会将其删除。请备份：钱包 → 导出私钥。",
@@ -342,11 +342,9 @@ export const zhHans: Record<StringKey, string> = {
   capacityTooManyOpen: "请先完成或等待未付款订单过期。",
   capacityQueueFull: "已排定的方案已达一年上限。",
   capacityClass: "容量等级",
-  projectedRate: "预计速度",
-  perEpoch: "周期内额外收益",
+  capacityRate: "算力倍数",
   cost: "费用",
   allocate: "启用 {plan}",
-  estimateNote: "按当前网络规模估算，最终数额以每日结算为准。",
   capacityDisclosure: MAINNET
     ? "使用你自己的钱包在 BNB 智能链上以 BNB 付款。LONG 只能通过挖矿产生，TGE 前锁定。"
     : "使用你自己的钱包在 BNB 智能链上以 BNB 付款。测试网 tLONG 没有任何货币价值。",
@@ -494,6 +492,7 @@ export const zhHant: Record<StringKey, string> = {
   humanCheckFailed: "真人驗證無法載入。請檢查網路，並對本站關閉內容封鎖器後重試。",
   // browser
   setupBodyWeb: "一次快速真人驗證，以及只有你能掌控的錢包。",
+  setupBodyWebNoCheck: "一個只有你能掌控的錢包。",
   stepHumanBody: "每次挖礦前都會再驗證一次",
   stepWalletBodyWeb: "私鑰只保存在此瀏覽器",
   webKeyNotice: "錢包私鑰只保存在此瀏覽器中。清除瀏覽器資料或使用無痕模式會將其刪除。請備份：錢包 → 匯出私鑰。",
@@ -553,11 +552,9 @@ export const zhHant: Record<StringKey, string> = {
   capacityTooManyOpen: "請先完成或等待未付款訂單過期。",
   capacityQueueFull: "已排定的方案已達一年上限。",
   capacityClass: "容量等級",
-  projectedRate: "預計速度",
-  perEpoch: "週期內額外收益",
+  capacityRate: "算力倍數",
   cost: "費用",
   allocate: "啟用 {plan}",
-  estimateNote: "按目前網路規模估算，最終數額以每日結算為準。",
   capacityDisclosure: MAINNET
     ? "使用你自己的錢包在 BNB 智能鏈上以 BNB 付款。LONG 只能透過挖礦產生，TGE 前鎖定。"
     : "使用你自己的錢包在 BNB 智能鏈上以 BNB 付款。測試網 tLONG 沒有任何貨幣價值。",

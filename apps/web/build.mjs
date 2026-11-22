@@ -1,13 +1,15 @@
 // Bundles the claim page (src/main.ts), the pay page (src/pay.ts), the bridge page (src/bridge.ts), the swap
-// page (src/swap.ts) and the Safe page (src/safe.ts) into dist/ with the API URL baked in. Usage: API_URL=https://api.example node build.mjs
+// page (src/swap.ts), the launch page (src/launch.ts) and the Safe page (src/safe.ts) into dist/ with the API
+// URL baked in. Usage: API_URL=https://api.example node build.mjs
 // (node build.mjs --out <folder> writes somewhere other than dist/).
 //
 // NETWORK picks the network the pages are for: testnet (the default) or mainnet. Its profile in
 // src/networks.json (BSC's chain, LONGYU's chain id and name, the symbols, what is open) is fixed
 // into every page and script, and the other network's values appear nowhere in the build. On mainnet,
 // which opens as a mining period, LONG is locked in wallets until the TGE: the bridge moves BNB only
-// (L1_TOKEN and L2_TOKEN are not read), the swap page is not built and no page links to it, and the
-// Safe page does not list the faucet's calls. CHAIN_ID, when set, must be the profile's LONGYU chain id.
+// (L1_TOKEN is not read, and L2_TOKEN only by the swap page), the swap page lists LONG as not tradable
+// yet and trades other tokens, and the Safe page does not list the faucet's calls. CHAIN_ID, when set,
+// must be the profile's LONGYU chain id.
 //   NETWORK             testnet or mainnet (default testnet)
 //   TOKEN_NAME, TOKEN_SYMBOL  the reward token on the claim page (default the profile's: tLONG, or LONG)
 //
@@ -27,16 +29,30 @@
 //   MINE_URL            LONGYU MINE in a browser, https (optional)
 //
 // The swap page reads L2_TOKEN, L2_RPC_URL and EXPLORER_URL too, and the two LONGYU Swap addresses recorded in
-// chain/testnet/README.md. It closes the same way when one is missing or invalid.
+// the network's README (chain/testnet/, chain/mainnet/). It closes the same way when one is missing or invalid.
+// It trades any token against BNB: L2_TOKEN is the one it lists (as not tradable yet on mainnet), and
+// TOKEN_LAUNCHER, when set, adds the tokens made with LONGYU Launch.
 //   SWAP_ROUTER         LONGYU Swap router on LONGYU
 //   SWAP_FACTORY        LONGYU Swap factory on LONGYU
+//
+// The launch page is built only when TOKEN_LAUNCHER is set, and a page links to it only then. It reads
+// L2_RPC_URL and EXPLORER_URL too. A value that is set and is not an address stops the build.
+//   TOKEN_LAUNCHER      LONGYU Launch (TokenLauncher) on LONGYU (optional)
 //
 // The Safe page reads L2_RPC_URL, L1_RPC_URL and EXPLORER_URL. It holds no contract address: a signer types
 // the Safe's address or opens a link that carries it.
 //
 // API_URL, L2_RPC_URL and L1_RPC_URL are also written into the pages' Content-Security-Policy: the pay, bridge,
 // swap and Safe pages may send requests to those addresses and to no other. One that is set and is not an
-// https address (http only on localhost) stops the build.
+// https address (http only on localhost) stops the build. The swap and launch pages show token logos
+// from API_URL (and the launch page uploads them there), so their policy names it for images too.
+//
+// The swap, launch and bridge pages share a bar that links each other, the explorer (EXPLORER_URL) and
+// the site (SITE_URL). Where they have names of their own, the bar and the landing and developer pages
+// link those: Swap to DEX_URL/, Launch to DEX_URL/launch, Bridge to BRIDGE_URL/ (the server's HOST_PAGES
+// serves them there). Unset, the links stay as they were.
+//   DEX_URL             https://dex.longyu.network (optional)
+//   BRIDGE_URL          https://bridge.longyu.network (optional)
 //
 // The landing page (src/landing.html) and the developer page (src/developers.html), served on the names in
 // the server's LANDING_HOSTS, link to everything else, so they are built only when all of these are set:
@@ -45,8 +61,8 @@
 //   SITE_URL            The landing page's own address, https://longyu.network
 //   APP_URL             These pages' address, https://testnet.longyu.network
 //   GITHUB_URL, X_URL   Links that show only when they are set (optional)
-// The developer page lists L2_TOKEN, SWAP_ROUTER, SWAP_FACTORY, L1_STANDARD_BRIDGE, L1_PORTAL and L1_TOKEN,
-// each only when it is set.
+// The developer page lists L2_TOKEN, SWAP_ROUTER, SWAP_FACTORY, TOKEN_LAUNCHER, L1_STANDARD_BRIDGE, L1_PORTAL
+// and L1_TOKEN, each only when it is set.
 import { build } from "esbuild";
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -61,9 +77,17 @@ export function profileFor(network) {
   return PROFILES[name];
 }
 
-/** The pages a network's build makes: the swap page only where it is open. */
-export function pagesFor(profile) {
-  return ["index.html", "pay.html", "bridge.html", ...(profile.swap ? ["swap.html"] : []), "safe.html"];
+/** Every page a build can make. */
+const PAGES = ["index.html", "pay.html", "bridge.html", "swap.html", "launch.html", "safe.html"];
+
+/**
+ * The pages a network's build makes: the swap page only where it is open, the launch page only when
+ * TOKEN_LAUNCHER is set. A TOKEN_LAUNCHER that is not an address throws.
+ */
+export function pagesFor(profile, settings = {}) {
+  const launcher = (settings.TOKEN_LAUNCHER ?? "").trim();
+  if (launcher && !/^0x[0-9a-fA-F]{40}$/.test(launcher)) throw new Error("TOKEN_LAUNCHER must be a contract address");
+  return PAGES.filter((page) => (page !== "swap.html" || profile.swap) && (page !== "launch.html" || launcher !== ""));
 }
 
 /** The BSC testnet node the bridge and Safe pages read when L1_RPC_URL is empty: DEFAULT_L1_RPC in src/bridge-core.ts. */
@@ -76,7 +100,8 @@ export const DEFAULT_L1_RPC = PROFILES.testnet.l1.rpc;
 const CONTACTS = {
   "pay.html": ["API_URL"],
   "bridge.html": ["L2_RPC_URL", "L1_RPC_URL"],
-  "swap.html": ["L2_RPC_URL"],
+  "swap.html": ["L2_RPC_URL", "API_URL"],
+  "launch.html": ["L2_RPC_URL", "API_URL"],
   "safe.html": ["L2_RPC_URL", "L1_RPC_URL"],
   "landing.html": ["L2_RPC_URL"],
   // It hands the network to a wallet and copies text: nothing leaves the page.
@@ -85,6 +110,18 @@ const CONTACTS = {
 
 // As a page's policy has it before the build narrows it.
 const ANY_ADDRESS = "connect-src https: http://localhost:*;";
+/** Logos served with the pages: BNB's, and the wallets' in the connect dialog (wallet-modal-core.ts WALLET_ICON). */
+export const WALLET_ICONS = ["bnb.png", "wallet-metamask.png", "wallet-trust.svg", "wallet-coinbase.png", "wallet-okx.png", "wallet-rabby.png"];
+const OWN_IMAGES = "img-src 'self';";
+
+// The pages that show images from elsewhere: token logos from the API; on the launch page the logo
+// being chosen, which it shows from the file before anything is sent; and the icons browser wallets
+// announce to the wallet dialog, which are data: images.
+const IMAGES = {
+  "swap.html": ["API_URL", "data:"],
+  "launch.html": ["API_URL", "blob:", "data:"],
+  "bridge.html": ["data:"],
+};
 
 /**
  * One address as a connect-src source: its origin and nothing after it.
@@ -113,19 +150,91 @@ export function connectSources(page, settings, profile = PROFILES.testnet) {
   for (const name of CONTACTS[page]) {
     const value = (settings[name] ?? "").trim() || (name === "L1_RPC_URL" ? profile.l1.rpc : "");
     if (value) sources.add(connectSource(name, value));
-    // With an empty API_URL the page asks the address it was served from.
-    else if (name === "API_URL") sources.add("'self'");
+    // With an empty API_URL the pay page asks the address it was served from; the others show no logos.
+    else if (name === "API_URL" && page === "pay.html") sources.add("'self'");
     // A page without its RPC address stays closed and sends nothing.
   }
   return sources.size ? [...sources] : ["'none'"];
 }
 
-/** A page as it is published: its policy names the addresses it was built with in place of any https address. */
+/** A page's img-src sources besides its own files, or null for a page that shows none from elsewhere. */
+export function imageSources(page, settings) {
+  if (!Object.hasOwn(IMAGES, page)) return null;
+  const sources = new Set();
+  for (const name of IMAGES[page]) {
+    if (name === "blob:" || name === "data:") sources.add(name);
+    else if ((settings[name] ?? "").trim()) sources.add(connectSource(name, settings[name].trim()));
+  }
+  return [...sources];
+}
+
+/**
+ * A page as it is published: its policy names the addresses it was built with in place of any https
+ * address, and the images it shows from elsewhere.
+ */
 export function publishedPage(page, html, settings, profile = PROFILES.testnet) {
   const sources = connectSources(page, settings, profile);
   if (!sources) return html;
   if (html.split(ANY_ADDRESS).length !== 2) throw new Error(`${page}: its Content-Security-Policy has no connect-src to narrow`);
-  return html.replace(ANY_ADDRESS, `connect-src ${sources.join(" ")};`);
+  let out = html.replace(ANY_ADDRESS, `connect-src ${sources.join(" ")};`);
+  const images = imageSources(page, settings);
+  if (images) {
+    if (out.split(OWN_IMAGES).length !== 2) throw new Error(`${page}: its Content-Security-Policy has no img-src to widen`);
+    out = out.replace(OWN_IMAGES, `img-src ${["'self'", ...images].join(" ")};`);
+  }
+  return out;
+}
+
+// The pages with the shared bar, and the optional names of their own.
+export const SHELL_PAGES = ["swap.html", "launch.html", "bridge.html"];
+const SHELL_SITES = ["DEX_URL", "BRIDGE_URL"];
+
+/**
+ * Where the bar's Swap, Launch and Bridge go: the pages' own names when they are set, else the pages
+ * next to `base` (the page's own folder, or APP_URL on the landing page). A name set that is not an
+ * https address with no path throws.
+ */
+export function shellLinks(settings, base = ".") {
+  const site = (name) => ((settings[name] ?? "").trim() ? httpsAddress(name, settings[name].trim(), true) : "");
+  const dex = site("DEX_URL");
+  const bridge = site("BRIDGE_URL");
+  return {
+    SWAP_HREF: dex ? `${dex}/` : `${base}/swap.html`,
+    LAUNCH_HREF: dex ? `${dex}/launch` : `${base}/launch.html`,
+    BRIDGE_HREF: bridge ? `${bridge}/` : `${base}/bridge.html`,
+  };
+}
+
+/**
+ * A page with the shared bar, its links written in: {{SWAP_HREF}}, {{LAUNCH_HREF}}, {{BRIDGE_HREF}},
+ * {{HOME_HREF}} (the site, or the pages' front page without SITE_URL), and {{EXPLORER_URL}},
+ * {{DEX_URL}}, {{BRIDGE_URL}} on lines marked data-optional with that name, which are left out when it
+ * is not set. Run after networkPage with "keep"; a name left over throws.
+ */
+export function shellPage(html, settings, page) {
+  const setting = (name) => (settings[name] ?? "").trim();
+  const values = { ...shellLinks(settings) };
+  values.HOME_HREF = setting("SITE_URL") ? `${httpsAddress("SITE_URL", setting("SITE_URL"), true)}/` : "./";
+  for (const name of SHELL_SITES) if (setting(name)) values[name] = httpsAddress(name, setting(name), true);
+  // The explorer link shows when the explorer's address is one; the pages say so on their own when it is not.
+  const explorer = setting("EXPLORER_URL").replace(/\/+$/, "");
+  try {
+    const url = new URL(explorer);
+    if (url.protocol === "https:" && !url.username && !url.password) values.EXPLORER_URL = explorer;
+  } catch {
+    // not an address: no link
+  }
+  const lines = [];
+  for (const line of html.split("\n")) {
+    const optional = / data-optional="([A-Z0-9_]+)"/.exec(line);
+    if (!optional) lines.push(line);
+    else if (![...SHELL_SITES, "EXPLORER_URL"].includes(optional[1])) throw new Error(`${page}: ${optional[1]} is not an optional value`);
+    else if (Object.hasOwn(values, optional[1])) lines.push(line.replace(optional[0], ""));
+  }
+  return lines.join("\n").replace(/\{\{([A-Z0-9_]+)\}\}/g, (whole, name) => {
+    if (!Object.hasOwn(values, name)) throw new Error(`${page}: no value for ${name}`);
+    return escapeHtml(values[name]);
+  });
 }
 
 // The addresses the landing page links to: each is a site's address with nothing after it.
@@ -133,7 +242,7 @@ const LANDING_SITES = ["SITE_URL", "APP_URL", "MINE_URL", "EXPLORER_URL"];
 // Links the landing page shows only when they are set.
 const LANDING_LINKS = ["GITHUB_URL", "X_URL"];
 // Contract addresses the developer page lists, each only when it is set.
-const LANDING_ADDRESSES = ["L2_TOKEN", "SWAP_ROUTER", "SWAP_FACTORY", "L1_STANDARD_BRIDGE", "L1_PORTAL", "L1_TOKEN"];
+const LANDING_ADDRESSES = ["L2_TOKEN", "SWAP_ROUTER", "SWAP_FACTORY", "TOKEN_LAUNCHER", "L1_STANDARD_BRIDGE", "L1_PORTAL", "L1_TOKEN"];
 
 const escapeHtml = (text) => text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -153,25 +262,31 @@ function profileValues(profile) {
 
 /**
  * A page for the build's network. A line marked data-network="testnet" (or "mainnet") is kept only
- * on that network, without the mark; the profile's values are written in. With `rest` "throw", a
+ * on that network, and a line marked data-page="launch.html" only when the build makes that page
+ * (`pages`), each without its mark; the profile's values are written in. With `rest` "throw", a
  * {{NAME}} left over stops the build; with "keep" it is left for landingPage.
  */
-export function networkPage(html, profile, page, rest = "throw") {
+export function networkPage(html, profile, page, rest = "throw", pages = pagesFor(profile)) {
   const values = profileValues(profile);
   const lines = [];
   for (const line of html.split("\n")) {
     const only = / data-network="([a-z]+)"/.exec(line);
-    if (!only) lines.push(line);
-    else if (!Object.hasOwn(PROFILES, only[1])) throw new Error(`${page}: data-network="${only[1]}" is not a network`);
-    else if (only[1] === profile.network) lines.push(line.replace(only[0], ""));
+    const linked = / data-page="([a-z]+\.html)"/.exec(line);
+    if (only && !Object.hasOwn(PROFILES, only[1])) throw new Error(`${page}: data-network="${only[1]}" is not a network`);
+    if (linked && !PAGES.includes(linked[1])) throw new Error(`${page}: data-page="${linked[1]}" is not a page`);
+    if (only && only[1] !== profile.network) continue;
+    if (linked && !pages.includes(linked[1])) continue;
+    lines.push(line.replace(only?.[0] ?? "", "").replace(linked?.[0] ?? "", ""));
   }
   const out = lines.join("\n").replace(/\{\{([A-Z0-9_]+)\}\}/g, (whole, name) => {
     if (Object.hasOwn(values, name)) return escapeHtml(values[name]);
     if (rest === "throw") throw new Error(`${page}: no value for ${name}`);
     return whole;
   });
-  // A page never links to one this network's build does not make.
-  if (!profile.swap && /swap\.html/.test(out)) throw new Error(`${page}: links to the swap page, which ${profile.network} does not build`);
+  // A page never links to one this build does not make.
+  for (const other of PAGES) {
+    if (!pages.includes(other) && out.includes(other)) throw new Error(`${page}: links to ${other}, which this build does not make`);
+  }
   return out;
 }
 
@@ -197,9 +312,10 @@ function httpsAddress(name, value, site) {
 export function landingPage(html, settings, page = "landing.html", profile = PROFILES.testnet) {
   const setting = (name) => (settings[name] ?? "").trim();
   if ([...LANDING_SITES, "L2_RPC_URL", "CHAIN_ID"].some((name) => !setting(name))) return null;
-  html = networkPage(html, profile, page, "keep");
+  html = networkPage(html, profile, page, "keep", pagesFor(profile, settings));
   const values = { CHAIN_NAME: setting("CHAIN_NAME") || profile.l2.name, NATIVE_SYMBOL: setting("NATIVE_SYMBOL") || profile.native };
   for (const name of LANDING_SITES) values[name] = httpsAddress(name, setting(name), true);
+  Object.assign(values, shellLinks(settings, values.APP_URL));
   connectSource("L2_RPC_URL", setting("L2_RPC_URL"));
   values.L2_RPC_URL = setting("L2_RPC_URL");
   if (!/^[1-9][0-9]{0,15}$/.test(setting("CHAIN_ID"))) throw new Error("CHAIN_ID must be a whole number");
@@ -239,7 +355,13 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   checkNetwork({ CHAIN_ID: env("CHAIN_ID") }, profile);
   // Before anything is bundled: a bad address stops the build here.
   const settings = { API_URL: apiUrl, L2_RPC_URL: env("L2_RPC_URL"), L1_RPC_URL: env("L1_RPC_URL") };
-  const pages = pagesFor(profile).map((page) => [page, publishedPage(page, networkPage(readFileSync(`src/${page}`, "utf8"), profile, page), settings, profile)]);
+  const made = pagesFor(profile, { TOKEN_LAUNCHER: env("TOKEN_LAUNCHER") });
+  const shellSettings = { SITE_URL: env("SITE_URL"), EXPLORER_URL: env("EXPLORER_URL"), DEX_URL: env("DEX_URL"), BRIDGE_URL: env("BRIDGE_URL") };
+  const pages = made.map((page) => {
+    const source = readFileSync(`src/${page}`, "utf8");
+    const html = SHELL_PAGES.includes(page) ? shellPage(networkPage(source, profile, page, "keep", made), shellSettings, page) : networkPage(source, profile, page, "throw", made);
+    return [page, publishedPage(page, html, settings, profile)];
+  });
   const landingSettings = {
     ...settings,
     SITE_URL: env("SITE_URL"),
@@ -254,9 +376,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     L2_TOKEN: env("L2_TOKEN"),
     SWAP_ROUTER: env("SWAP_ROUTER"),
     SWAP_FACTORY: env("SWAP_FACTORY"),
+    TOKEN_LAUNCHER: env("TOKEN_LAUNCHER"),
     L1_STANDARD_BRIDGE: env("L1_STANDARD_BRIDGE"),
     L1_PORTAL: env("L1_PORTAL"),
     L1_TOKEN: env("L1_TOKEN"),
+    DEX_URL: env("DEX_URL"),
+    BRIDGE_URL: env("BRIDGE_URL"),
   };
   const landing = landingPage(readFileSync("src/landing.html", "utf8"), landingSettings, "landing.html", profile);
   if (landing !== null) {
@@ -270,7 +395,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       main: "src/main.ts",
       pay: "src/pay.ts",
       bridge: "src/bridge.ts",
-      ...(profile.swap ? { swap: "src/swap.ts" } : {}),
+      ...(made.includes("swap.html") ? { swap: "src/swap.ts" } : {}),
+      ...(made.includes("launch.html") ? { launch: "src/launch.ts" } : {}),
       safe: "src/safe.ts",
       ...(landing === null ? {} : { landing: "src/landing.ts", developers: "src/developers.ts" }),
     },
@@ -314,9 +440,22 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
         router: env("SWAP_ROUTER"),
         factory: env("SWAP_FACTORY"),
         token: env("L2_TOKEN"),
+        launcher: env("TOKEN_LAUNCHER"),
         rpcUrl: env("L2_RPC_URL"),
         explorerUrl: env("EXPLORER_URL"),
+        // Where token logos are read: logoApi in src/swap-core.ts.
+        apiUrl,
       } : null),
+      // Checked by parseLaunchConfig in src/launch-core.ts.
+      __LAUNCH_CONFIG__: JSON.stringify({
+        launcher: env("TOKEN_LAUNCHER"),
+        rpcUrl: env("L2_RPC_URL"),
+        explorerUrl: env("EXPLORER_URL"),
+        // The new token's "Add liquidity" link goes to the swap page only when it is built.
+        swapPage: made.includes("swap.html"),
+        // Where token logos are read and set.
+        apiUrl,
+      }),
       // Checked by parseSafeConfig in src/safe-core.ts.
       __SAFE_CONFIG__: JSON.stringify({
         l1RpcUrl: env("L1_RPC_URL"),
@@ -334,13 +473,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     },
   });
   for (const [page, html] of pages) writeFileSync(`${out}/${page}`, html);
-  copyFileSync("src/favicon.svg", `${out}/favicon.svg`);
-  copyFileSync("src/mark.svg", `${out}/mark.svg`);
-  if (landing !== null) {
-    copyFileSync("src/lockup.svg", `${out}/lockup.svg`);
-    copyFileSync("src/share.png", `${out}/share.png`);
-    // The fonts, and the licence they are published under.
-    for (const name of readdirSync("src/fonts")) if (/\.woff2$|^OFL\.txt$/.test(name)) copyFileSync(`src/fonts/${name}`, `${out}/${name}`);
-  }
+  // What every page may use (SHARED_FILES in server.mjs): the icons, the pages' stylesheet, the lockup,
+  // and the fonts with the licence they are published under.
+  for (const name of ["favicon.svg", "mark.svg", "lockup.svg", "app.css", ...WALLET_ICONS]) copyFileSync(`src/${name}`, `${out}/${name}`);
+  for (const name of readdirSync("src/fonts")) if (/\.woff2$|^OFL\.txt$/.test(name)) copyFileSync(`src/fonts/${name}`, `${out}/${name}`);
+  if (landing !== null) copyFileSync("src/share.png", `${out}/share.png`);
   console.log(`built ${out}/ for ${profile.network}${landing === null ? " (without the landing and developer pages: their addresses are not all set)" : ""}`);
 }

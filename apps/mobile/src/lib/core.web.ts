@@ -432,11 +432,15 @@ async function humanToken(): Promise<string> {
   }
 }
 
-/** Registers this browser: a human check stands in for the device proof a phone gives. */
+/** Registers this browser: a human check stands in for the device proof a phone gives, unless the API has it switched off. */
 export async function attestDevice(): Promise<void> {
-  // The check first: the API's challenge is short-lived, and the person may take a while.
-  const token = await humanToken();
-  const c = await api<{ challengeId: string }>("POST", "/v1/device/challenge");
+  let c = await api<{ challengeId: string; humanCheck?: boolean }>("POST", "/v1/device/challenge");
+  let token = "skipped";
+  if (c.humanCheck !== false) {
+    token = await humanToken();
+    // The challenge is short-lived and the check may take a while: a fresh one replaces it.
+    c = await api<{ challengeId: string }>("POST", "/v1/device/challenge");
+  }
   const r = await api<{ attested: boolean }>("POST", "/v1/device/attest", { challengeId: c.challengeId, token });
   if (!r.attested) throw new ApiError(403, "check_cancelled");
 }

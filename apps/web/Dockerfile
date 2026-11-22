@@ -1,4 +1,4 @@
-# LONGYU's web pages (the landing page, claim, pay, bridge, swap, safe), built once and served as fixed files.
+# LONGYU's web pages (the landing page, claim, pay, bridge, swap, launch, safe), built once and served as fixed files.
 # Build from the repository root: docker build -f apps/web/Dockerfile -t longyu-web .
 FROM node:24-slim AS build
 WORKDIR /app
@@ -35,9 +35,12 @@ ARG L2_RPC_URL
 ARG L1_RPC_URL
 ARG SWAP_ROUTER
 ARG SWAP_FACTORY
+ARG TOKEN_LAUNCHER
 ARG MINE_URL
 ARG SITE_URL
 ARG APP_URL
+ARG DEX_URL
+ARG BRIDGE_URL
 ARG GITHUB_URL
 ARG X_URL
 RUN cd apps/web && rm -rf dist && node build.mjs

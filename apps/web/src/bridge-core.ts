@@ -453,3 +453,27 @@ export function longyuChainParams(cfg: Pick<BridgeConfig, "l2RpcUrl" | "explorer
     ...(cfg.explorerUrl ? { blockExplorerUrls: [cfg.explorerUrl] } : {}),
   };
 }
+
+/** The three steps of a withdrawal, as the withdrawal list draws them. */
+export const WITHDRAWAL_STEPS = ["Started", "Proved", "Finalized"] as const;
+
+/**
+ * How many of the steps are done for a status, or null for a status that is not on the way (failed,
+ * not a withdrawal, unknown). A withdrawal not yet on LONGYU has none done.
+ */
+export function stepsDone(status: string): number | null {
+  switch (status) {
+    case "pending":
+      return 0;
+    case "waiting-to-prove":
+    case "ready-to-prove":
+      return 1;
+    case "waiting-to-finalize":
+    case "ready-to-finalize":
+      return 2;
+    case "finalized":
+      return 3;
+    default:
+      return null;
+  }
+}

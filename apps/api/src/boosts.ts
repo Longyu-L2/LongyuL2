@@ -1,8 +1,9 @@
 /**
  * Paid mining boosts. A verified miner buys a plan (for example +50% for 30 days), pays it in real
  * USDT or BNB through PaymentRouter on BSC, and from the day the payment is final their sessions
- * weigh more in the daily settlement. The day's emission is fixed, so a boost raises the buyer's
- * share of it and never creates tokens. A user's boosts run back to back, never overlapping.
+ * weigh more in the daily settlement. The day's budget is a ceiling: below it a boost raises the
+ * buyer's reward and takes nothing from anyone; above it every reward is scaled alike. A boost never
+ * creates tokens beyond the budget. A user's boosts run back to back, never overlapping.
  */
 import { SECONDS_PER_DAY } from "@longyu/reward-engine";
 import type { Deps } from "./context.ts";

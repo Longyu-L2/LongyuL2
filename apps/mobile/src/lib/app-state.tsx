@@ -24,6 +24,8 @@ export interface Me {
   invites: string;
   wallet: string | null;
   deviceAttested: boolean;
+  /** False when the API has the human check switched off; older APIs leave it out (on). */
+  humanCheck?: boolean;
 }
 
 export interface Network {

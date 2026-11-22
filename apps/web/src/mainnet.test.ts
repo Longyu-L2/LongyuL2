@@ -7,6 +7,8 @@ import { CALLS, CHAIN_NAMES } from "./safe-core.ts";
 import { explorerTxUrl } from "./pay-core.ts";
 import { rewardSymbol } from "./chain.ts";
 import { L1_CHAIN, PROFILE } from "./profile.ts";
+import { MINING_PHASE, WBNB, rateText, standing, tokenFrom } from "./swap-core.ts";
+import { launchErrorMessage } from "./launch-core.ts";
 
 const address = (n: number) => getAddress(`0x${n.toString(16).padStart(40, "0")}`);
 const live = {
@@ -82,4 +84,16 @@ test("mainnet: the Safe page knows no faucet call", () => {
   const names = new Set(CALLS.map((c) => c.fn.name));
   for (const name of ["drip", "lastDripAt", "dispensedToday", "maxPerVoucher"]) assert.ok(!names.has(name), name);
   assert.ok(names.has("grantRole"), "the other contracts' calls stay");
+});
+
+test("mainnet: the swap page lists LONG as not tradable yet, refuses look-alikes and trades other tokens against BNB", () => {
+  const LONG = "0xc6D2B2483EC93C15109FCe43d21Ac05919031655";
+  assert.equal(PROFILE.tradeToken, false);
+  assert.equal(MINING_PHASE, "Official LONG is in its mining phase and not tradable yet.");
+  assert.deepEqual(standing({ address: LONG.toLowerCase(), name: "LONGYU", symbol: "LONG" }, LONG, false), { kind: "mining", trade: false, note: MINING_PHASE });
+  assert.deepEqual(standing({ address: address(8), name: "LONG", symbol: "L0NG" }, LONG, false), { kind: "imitation", trade: false, note: `Not LONGYU's token. The only official LONG is ${LONG}.` });
+  assert.equal(standing({ address: address(8), name: "Moon Coffee", symbol: "MOON" }, LONG, true).trade, true);
+  assert.equal(rateText({ bnb: 10n ** 18n, token: 2500n * 10n ** 18n }, 18, "MOON"), "1 BNB = 2500 MOON");
+  assert.deepEqual(tokenFrom(WBNB, { name: { status: "success", result: "Wrapped BNB" }, symbol: { status: "success", result: "WBNB" }, decimals: { status: "success", result: 18 } }), { ok: false, error: "That is wrapped BNB. Choose the token to trade against BNB." });
+  assert.equal(launchErrorMessage(new Error("insufficient funds for gas * price + value")), "Not enough BNB for gas.");
 });

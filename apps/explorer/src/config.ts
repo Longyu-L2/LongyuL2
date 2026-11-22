@@ -28,6 +28,8 @@ export const ConfigSchema = z.object({
   BRIDGE_URL: z.string().url().default("https://testnet.longyu.network/bridge.html"),
   /** LONGYU Swap's page; the footer links to it when set. */
   SWAP_URL: z.string().url().startsWith("https://").optional(),
+  /** LONGYU's API, where creators' token logos are read (/v1/tokens/<token>/logo). Unset: monograms only. */
+  TOKEN_LOGO_API: z.string().url().startsWith("https://").optional(),
   /** LONGYU's website, mining app, developer guide and source code; the menu and the footer link to each one that is set. */
   WEBSITE_URL: z.string().url().startsWith("https://").optional(),
   MINE_URL: z.string().url().startsWith("https://").optional(),
@@ -35,6 +37,18 @@ export const ConfigSchema = z.object({
   GITHUB_URL: z.string().url().startsWith("https://").optional(),
   /** Names for LONGYU's own contracts, as address:Label pairs, comma-separated. */
   KNOWN_ADDRESSES: z.string().default(""),
+  /** LONGYU Launch (TokenLauncher): tokens it made are marked as plain fixed-supply tokens with no owner. */
+  TOKEN_LAUNCHER: z.string().regex(/^0x[0-9a-fA-F]{40}$/, "an address").optional(),
+  /**
+   * LONGYU's own tokens (LONG), comma-separated addresses. They are marked official, and any other
+   * token whose name or symbol passes for LONG or LONGYU carries a warning that names them.
+   */
+  /** A line shown on the official token's page and in every imitation warning ("... not tradable yet"). */
+  OFFICIAL_NOTE: z.string().max(200).default(""),
+  OFFICIAL_TOKENS: z
+    .string()
+    .default("")
+    .refine((v) => v.split(",").map((s) => s.trim()).filter(Boolean).every((a) => /^0x[0-9a-fA-F]{40}$/.test(a)), "comma-separated addresses"),
 
   START_BLOCK: z.coerce.bigint().default(0n),
   /** Blocks fetched per indexer step. */

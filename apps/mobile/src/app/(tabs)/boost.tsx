@@ -1,6 +1,7 @@
 /**
  * Mining capacity: the active class and its epoch, and a configurator for the next allocation:
- * capacity class (C1 to C5) and epoch (7, 30 or 90 days), with the projected rate. Allocating
+ * capacity class (C1 to C5) and epoch (1, 3 or 7 days), with the capacity it gives. No amount of
+ * LONG is promised or estimated here: what a miner earns is settled each day. Allocating
  * creates an order and opens LONGYU's payment page, where the user pays in BNB on BNB Smart Chain
  * from their own wallet; the payment transaction is the on-chain receipt, and the epoch starts once
  * it is final. Every amount and condition is shown before the user leaves the app.
@@ -9,9 +10,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Linking, Platform, Pressable, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { api, ApiError } from "@/lib/core";
-import { useApp, useSymbol } from "@/lib/app-state";
+import { useApp } from "@/lib/app-state";
 import { errorKeyOf } from "@/lib/errors";
-import { capacityClass, fill, formatToken, multiplier } from "@/lib/format";
+import { capacityClass, fill, multiplier } from "@/lib/format";
 import { colors, radius, space, tabular, tones } from "@/design/tokens";
 import { select } from "@/design/haptics";
 import { Button, Card, Col, Columns, Divider, ErrorText, List, Notice, Pill, Progress, Row, Screen, Section, Skeleton, T, TopBar } from "@/components/ui";
@@ -40,7 +41,6 @@ const PAGE = /^https?:\/\//i;
 /** Opened from Mine, inside the tabs (their layout checks the sign-in). */
 export default function CapacityScreen() {
   const { t } = useApp();
-  const symbol = useSymbol();
   const [view, setView] = useState<CapacityView | null>(null);
   const [status, setStatus] = useState<Status | null>(null);
   const [cls, setCls] = useState<string | null>(null);
@@ -79,7 +79,8 @@ export default function CapacityScreen() {
     return [...byClass.values()].sort((a, b) => a.bps - b.bps).map((c) => ({ ...c, plans: c.plans.sort((a, b) => a.days - b.days) }));
   }, [view]);
   const chosen = classes.find((c) => c.id === cls) ?? classes[Math.min(2, classes.length - 1)];
-  const plan = chosen?.plans.find((p) => p.days === days) ?? chosen?.plans.find((p) => p.days === 30) ?? chosen?.plans[0] ?? null;
+  // The middle epoch until the user picks one.
+  const plan = chosen?.plans.find((p) => p.days === days) ?? chosen?.plans[Math.floor((chosen?.plans.length ?? 1) / 2)] ?? null;
   const nameOf = (bps: number) => classes.find((c) => c.bps === bps)?.id ?? multiplier(bps);
   // What can be chosen now: shown only while plans are on offer.
   const offer = view?.available && chosen && plan ? { view, chosen, plan } : null;
@@ -91,10 +92,8 @@ export default function CapacityScreen() {
   const awaiting = (view?.orders ?? []).filter((o) => o.status === "open" || o.status === "review");
   const history = (view?.orders ?? []).filter((o) => o.status !== "open" && o.status !== "review");
 
-  // Projection from today's estimate: the unboosted rate, scaled by the chosen class.
-  const baseRate = status ? (BigInt(status.estimatedPerHour) * 10_000n) / BigInt(10_000 + status.boostBps) : null;
-  const projected = baseRate !== null && plan ? (baseRate * BigInt(10_000 + plan.boostBps)) / 10_000n : null;
-  const perEpoch = baseRate !== null && plan ? (baseRate * BigInt(plan.boostBps) * 24n * BigInt(plan.days)) / 10_000n : null;
+  // The capacity now and with the chosen class; never an amount of LONG.
+  const nowBps = status?.boostBps ?? 0;
 
   const closeReview = () => {
     setReviewing(false);
@@ -237,19 +236,17 @@ export default function CapacityScreen() {
             <>
               <Card>
                 <View style={{ gap: 4 }}>
-                  <T variant="small" color={colors.textSoft}>{t("projectedRate")}</T>
+                  <T variant="small" color={colors.textSoft}>{t("capacityRate")}</T>
                   <View style={{ flexDirection: "row", alignItems: "center", gap: space.sm, flexWrap: "wrap" }}>
-                    <T variant="headline" color={colors.textFaint} style={tabular}>{baseRate !== null ? formatToken(baseRate, 3) : "–"}</T>
+                    <T variant="headline" color={colors.textFaint} style={tabular}>{multiplier(nowBps)}</T>
                     <Icon name="chevronRight" size={16} color={colors.textFaint} />
-                    <T variant="display" style={tabular}>{projected !== null ? formatToken(projected, 3) : "–"}</T>
-                    <T variant="label" color={colors.textSoft}>{`${symbol}/h`}</T>
+                    <T variant="display" style={tabular}>{multiplier(offer.plan.boostBps)}</T>
                   </View>
                 </View>
                 <Divider />
-                <Line label={t("perEpoch")} value={perEpoch !== null ? `+${formatToken(perEpoch, 0)} ${symbol}` : "–"} />
+                <Line label={t("epoch")} value={`${offer.plan.days} ${t("daysShort")}`} />
                 <Line label={t("starts")} value={starts} />
                 <Line label={t("cost")} value={`${offer.plan.price} ${offer.plan.token}`} strong />
-                <T variant="small" color={colors.textFaint}>{t("estimateNote")}</T>
               </Card>
 
               {offer.view.eligible ? (

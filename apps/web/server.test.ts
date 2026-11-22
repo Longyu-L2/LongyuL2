@@ -4,7 +4,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { brotliDecompressSync, gunzipSync } from "node:zlib";
 // @ts-expect-error a plain JavaScript module without type declarations
-import { createHandler, loadFiles, loadLanding, parseLandingHosts, parsePages, parseRedirect } from "./server.mjs";
+import { createHandler, loadFiles, loadLanding, parseHostPages, parseLandingHosts, parsePages, parseRedirect } from "./server.mjs";
 import { request } from "node:http";
 
 const built: Record<string, string> = {
@@ -12,9 +12,16 @@ const built: Record<string, string> = {
   "pay.html": "<!doctype html><title>pay</title>", "pay.js": "console.log('pay');",
   "bridge.html": "<!doctype html><title>bridge</title>", "bridge.js": "console.log('bridge');".repeat(200),
   "swap.html": "<!doctype html><title>swap</title>", "swap.js": "console.log('swap');",
+  "launch.html": "<!doctype html><title>launch</title>", "launch.js": "console.log('launch');",
   "safe.html": "<!doctype html><title>safe</title>", "safe.js": "console.log('safe');",
   "favicon.svg": '<svg xmlns="http://www.w3.org/2000/svg"/>', "mark.svg": '<svg xmlns="http://www.w3.org/2000/svg"><title>LONGYU</title></svg>',
+  "app.css": '@font-face { font-family: Inter; src: url("./Inter-Regular.woff2") format("woff2"); } body { font-family: Inter; }'.repeat(20),
+  "lockup.svg": '<svg xmlns="http://www.w3.org/2000/svg"><title>lockup</title></svg>',
+  "Inter-Regular.woff2": "regular ".repeat(100), "Inter-SemiBold.woff2": "semibold ".repeat(100), "Sora-SemiBold.woff2": "sora ".repeat(100), "JetBrainsMono-Medium.woff2": "mono ".repeat(100),
+  "OFL.txt": "SIL OPEN FONT LICENSE Version 1.1",
+  "bnb.png": "png ".repeat(50), "wallet-metamask.png": "png ".repeat(50), "wallet-trust.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"/>", "wallet-coinbase.png": "png ".repeat(50), "wallet-okx.png": "png ".repeat(50), "wallet-rabby.png": "png ".repeat(50),
 };
+const shared = ["/favicon.svg", "/mark.svg", "/app.css", "/lockup.svg", "/Inter-Regular.woff2", "/Inter-SemiBold.woff2", "/Sora-SemiBold.woff2", "/JetBrainsMono-Medium.woff2", "/OFL.txt", "/bnb.png", "/wallet-metamask.png", "/wallet-trust.svg", "/wallet-coinbase.png", "/wallet-okx.png", "/wallet-rabby.png"];
 const servers: Server[] = [];
 async function site(pages?: string): Promise<string> {
   const server = createServer(createHandler(loadFiles(parsePages(pages), (name: string) => Buffer.from(built[name]!))));
@@ -30,7 +37,7 @@ after(() => {
 });
 
 test("pages: the list is checked", () => {
-  assert.deepEqual(parsePages(undefined), ["claim", "pay", "bridge", "swap", "safe"]);
+  assert.deepEqual(parsePages(undefined), ["claim", "pay", "bridge", "swap", "launch", "safe"]);
   assert.deepEqual(parsePages("bridge,swap"), ["bridge", "swap"]);
   assert.deepEqual(parsePages(" bridge , pay,bridge "), ["bridge", "pay"]);
   assert.throws(() => parsePages("bridge,admin"), /unknown page "admin"/);
@@ -64,7 +71,7 @@ test("every page is served with its headers, compressed when asked", async () =>
     assert.equal(body.toString(), built["bridge.js"], encoding);
     assert.equal(r.headers.get("vary"), "accept-encoding");
   }
-  for (const page of ["/pay.html", "/pay.js", "/main.js", "/bridge.html", "/index.html", "/swap.html", "/swap.js", "/safe.html", "/safe.js"]) assert.equal((await fetch(url + page)).status, 200, page);
+  for (const page of ["/pay.html", "/pay.js", "/main.js", "/bridge.html", "/index.html", "/swap.html", "/swap.js", "/launch.html", "/launch.js", "/safe.html", "/safe.js"]) assert.equal((await fetch(url + page)).status, 200, page);
   assert.equal((await fetch(`${url}/bridge.html?ref=x`)).status, 200);
 });
 
@@ -102,7 +109,29 @@ test("the stored compressed copies decode to the built file", () => {
   assert.equal(brotliDecompressSync(f.br).toString(), built["bridge.js"]);
   assert.equal(gunzipSync(f.gzip).toString(), built["bridge.js"]);
   assert.ok(f.br.length < f.raw.length / 10);
-  assert.deepEqual([...files.keys()], ["/bridge.html", "/bridge.js", "/favicon.svg", "/mark.svg"]);
+  assert.deepEqual([...files.keys()], ["/bridge.html", "/bridge.js", ...shared]);
+});
+
+test("the styles name their fonts by their content, and the page names the styles by theirs", async () => {
+  const page = '<!doctype html><link rel="stylesheet" href="./app.css" /><script type="module" src="./bridge.js"></script>';
+  const read = (changed: Record<string, string>) => (name: string) => Buffer.from({ ...built, "bridge.html": page, ...changed }[name]!);
+  const { files } = loadFiles(["bridge"], read({}));
+  const css = files.get("/app.css");
+  const font = files.get("/Inter-Regular.woff2").version;
+  assert.match(font, /^[0-9a-f]{12}$/);
+  assert.equal(css.type, "text/css; charset=utf-8");
+  assert.ok(css.raw.toString().includes(`url("./Inter-Regular.woff2?v=${font}")`));
+  assert.ok(!css.raw.toString().includes('url("./Inter-Regular.woff2")'));
+  assert.equal(brotliDecompressSync(css.br).toString(), css.raw.toString());
+  assert.ok(files.get("/bridge.html").raw.toString().includes(`href="./app.css?v=${css.version}"`));
+
+  // A new font, with the same styles as written, gives the styles and the page new addresses.
+  const next = loadFiles(["bridge"], read({ "Inter-Regular.woff2": "next ".repeat(100) })).files;
+  assert.notEqual(next.get("/app.css").version, css.version);
+  assert.ok(next.get("/app.css").raw.toString().includes(`url("./Inter-Regular.woff2?v=${next.get("/Inter-Regular.woff2").version}")`));
+  assert.ok(next.get("/bridge.html").raw.toString().includes(`href="./app.css?v=${next.get("/app.css").version}"`));
+  // Another font changes nothing here.
+  assert.equal(loadFiles(["bridge"], read({ "Sora-SemiBold.woff2": "other ".repeat(100) })).files.get("/app.css").version, css.version);
 });
 
 test("an unchanged file is not sent twice", async () => {
@@ -124,7 +153,7 @@ test("only the chosen pages are public", async () => {
   assert.equal(home.headers.get("x-frame-options"), "DENY");
   assert.equal((await fetch(`${url}/bridge.html`)).status, 200);
   assert.equal((await fetch(`${url}/bridge.js`)).status, 200);
-  for (const hidden of ["/index.html", "/main.js", "/pay.html", "/pay.js", "/swap.html", "/swap.js", "/safe.html", "/safe.js"]) assert.equal((await fetch(url + hidden)).status, 404, hidden);
+  for (const hidden of ["/index.html", "/main.js", "/pay.html", "/pay.js", "/swap.html", "/swap.js", "/launch.html", "/launch.js", "/safe.html", "/safe.js"]) assert.equal((await fetch(url + hidden)).status, 404, hidden);
   // The icon belongs to every page.
   const icon = await fetch(`${url}/favicon.ico`);
   assert.equal(icon.url, `${url}/favicon.svg`);
@@ -250,7 +279,9 @@ test("the landing page has names of its own, which serve it and nothing of the p
   const claim = await ask("testnet.longyu.network", "/");
   assert.equal(claim.body, built["index.html"]);
   assert.equal((await ask("testnet.longyu.network", "/bridge.html")).status, 200);
-  for (const other of ["/landing.html", "/landing.js", "/developers", "/developers.html", "/developers.js", "/lockup.svg", "/share.png", "/Inter-Regular.woff2", "/OFL.txt"]) assert.equal((await ask("testnet.longyu.network", other)).status, 404, other);
+  for (const other of ["/landing.html", "/landing.js", "/developers", "/developers.html", "/developers.js", "/share.png"]) assert.equal((await ask("testnet.longyu.network", other)).status, 404, other);
+  // The shared styles, images and fonts belong to the pages as well.
+  for (const own of ["/lockup.svg", "/Inter-Regular.woff2", "/OFL.txt", "/app.css"]) assert.equal((await ask("testnet.longyu.network", own)).status, 200, own);
   // And www goes to the landing page's name.
   const www = await ask("www.longyu.network", "/?ref=x");
   assert.deepEqual([www.status, www.location], [302, "https://longyu.network/?ref=x"]);
@@ -263,4 +294,100 @@ test("the landing page has names of its own, which serve it and nothing of the p
   assert.equal((await fetch(`${plainUrl}/landing.html`)).status, 404);
   assert.equal((await fetch(`${plainUrl}/developers`)).status, 404);
   assert.equal(await (await fetch(`${plainUrl}/`)).text(), built["index.html"]);
+});
+
+test("names that serve some of the pages are checked", () => {
+  const pages = parsePages(undefined);
+  assert.equal(parseHostPages(undefined, pages), null);
+  assert.equal(parseHostPages(" ; ", pages), null);
+  assert.deepEqual([...parseHostPages("dex.longyu.network=swap,launch; bridge.longyu.network=bridge", pages)], [["dex.longyu.network", ["swap", "launch"]], ["bridge.longyu.network", ["bridge"]]]);
+  assert.deepEqual([...parseHostPages(" DEX.Longyu.Network = launch , swap ; ", pages)], [["dex.longyu.network", ["launch", "swap"]]]);
+  for (const bad of ["dex.longyu.network", "=swap", "a.longyu.network,b.longyu.network=swap"]) assert.throws(() => parseHostPages(bad, pages), /HOST_PAGES: ".*" is not host=page\[,page\.\.\.\]/, bad);
+  assert.throws(() => parseHostPages("dex.longyu.network=", pages), /HOST_PAGES: "dex.longyu.network" names no page/);
+  assert.throws(() => parseHostPages("dex.longyu.network= , ", pages), /names no page/);
+  assert.throws(() => parseHostPages("dex.longyu.network/x=swap", pages), /HOST_PAGES: "dex.longyu.network\/x" is not a host name/);
+  assert.throws(() => parseHostPages("dex=swap", pages), /HOST_PAGES: "dex" is not a host name/);
+  assert.throws(() => parseHostPages("dex.longyu.network=swap; DEX.longyu.network=launch", pages), /HOST_PAGES: "dex.longyu.network" is named twice/);
+  assert.throws(() => parseHostPages("dex.longyu.network=admin", pages), /HOST_PAGES: unknown page "admin"/);
+  assert.throws(() => parseHostPages("dex.longyu.network=constructor", pages), /HOST_PAGES: unknown page/);
+  assert.throws(() => parseHostPages("dex.longyu.network=Swap", pages), /HOST_PAGES: unknown page "Swap"/);
+  assert.throws(() => parseHostPages("dex.longyu.network=swap,launch", parsePages("swap,bridge")), /HOST_PAGES: page "launch" is not one of PAGES/);
+  assert.throws(() => parseHostPages("dex.longyu.network=swap,launch,swap", pages), /HOST_PAGES: page "swap" is named twice for "dex.longyu.network"/);
+  const redirect = parseRedirect("www.longyu.network", "https://longyu.network");
+  const landing = parseLandingHosts("longyu.network", redirect);
+  assert.throws(() => parseHostPages("longyu.network=swap", pages, { landing, redirect }), /HOST_PAGES: "longyu.network" is also one of LANDING_HOSTS/);
+  assert.throws(() => parseHostPages("www.longyu.network=swap", pages, { landing, redirect }), /HOST_PAGES: "www.longyu.network" is also one of REDIRECT_HOSTS/);
+  assert.equal(parseHostPages("dex.longyu.network=swap", pages, { landing, redirect }).size, 1);
+});
+
+test("a name of its own serves its pages from the top, and nothing of the other pages", async () => {
+  const template = '<!doctype html><title>PAGE</title><link rel="icon" href="./favicon.svg" /><link rel="stylesheet" href="./app.css" /><img src="./lockup.svg" /><a href="./launch.html">Launch</a><script type="module" src="./PAGE.js"></script>';
+  const own: Record<string, string> = { ...built, "swap.html": template.replaceAll("PAGE", "swap"), "launch.html": template.replaceAll("PAGE", "launch"), "bridge.html": template.replaceAll("PAGE", "bridge") };
+  const pages = parsePages(undefined);
+  const loaded = loadFiles(pages, (name: string) => Buffer.from(own[name]!));
+  const server = createServer(createHandler(loaded, null, null, parseHostPages("dex.longyu.network=swap,launch; bridge.longyu.network=bridge", pages)));
+  servers.push(server);
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as AddressInfo).port;
+  type Answer = { status: number; type: string | undefined; encoding: string | undefined; cache: string | undefined; location: string | undefined; etag: string | undefined; frame: string | undefined; body: string };
+  const ask = (host: string, path: string, headers: Record<string, string> = {}, method = "GET") => new Promise<Answer>((resolve, reject) => {
+    request({ host: "127.0.0.1", port, path, method, headers: { host, "accept-encoding": "identity", ...headers } }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("end", () => resolve({ status: res.statusCode!, type: res.headers["content-type"], encoding: res.headers["content-encoding"], cache: res.headers["cache-control"], location: res.headers.location, etag: res.headers.etag, frame: res.headers["x-frame-options"] as string | undefined, body: Buffer.concat(chunks).toString() }));
+    }).on("error", reject).end();
+  });
+  const swapHtml: string = loaded.files.get("/swap.html").raw.toString();
+  const launchHtml: string = loaded.files.get("/launch.html").raw.toString();
+
+  const top = await ask("DEX.longyu.network:443", "/");
+  assert.deepEqual([top.status, top.type, top.cache, top.frame], [200, "text/html; charset=utf-8", "no-cache", "DENY"]);
+  assert.ok(top.body.includes("<title>swap</title>"));
+  // The same page, named by the same content, as on the pages' own name.
+  assert.equal(top.body, swapHtml);
+  assert.equal(top.etag, loaded.files.get("/swap.html").etag);
+  assert.equal((await ask("dex.longyu.network", "/", { "if-none-match": top.etag! })).status, 304);
+  assert.equal((await ask("dex.longyu.network", "/", { "accept-encoding": "br" })).encoding, "br");
+  assert.equal((await ask("dex.longyu.network", "/swap")).body, swapHtml);
+  assert.equal((await ask("dex.longyu.network", "/swap.html")).body, swapHtml);
+  assert.equal((await ask("dex.longyu.network", "/launch.html")).body, launchHtml);
+  const launch = await ask("dex.longyu.network", "/launch?ref=x");
+  assert.equal(launch.body, launchHtml);
+  assert.ok(launch.body.includes("<title>launch</title>"));
+
+  // The page's own addresses are at the top of the name, so they work from "/launch" as from "/".
+  const script = /src="(\.\/launch\.js\?v=[0-9a-f]{12})"/.exec(launch.body)![1]!;
+  const styles = /href="(\.\/app\.css\?v=[0-9a-f]{12})"/.exec(launch.body)![1]!;
+  for (const address of [script, styles]) {
+    const at = new URL(address, "https://dex.longyu.network/launch");
+    const r = await ask("dex.longyu.network", at.pathname + at.search);
+    assert.deepEqual([r.status, r.cache], [200, "public, max-age=31536000, immutable"], address);
+  }
+  assert.equal((await ask("dex.longyu.network", "/app.css")).type, "text/css; charset=utf-8");
+  assert.equal((await ask("dex.longyu.network", "/swap.js")).body, built["swap.js"]);
+  for (const file of shared) assert.equal((await ask("dex.longyu.network", file)).status, 200, file);
+  assert.equal((await ask("dex.longyu.network", "/health")).body, "ok");
+  const icon = await ask("dex.longyu.network", "/favicon.ico");
+  assert.deepEqual([icon.status, icon.location], [301, "/favicon.svg"]);
+  for (const other of ["/bridge.html", "/bridge.js", "/bridge", "/index.html", "/main.js", "/pay.html", "/safe.html", "/claim", "/launch/", "/swap/", "/Launch", "/launch.html/", "/landing.html", "/developers", "/server.mjs", "//swap.js"]) {
+    const r = await ask("dex.longyu.network", other);
+    assert.deepEqual([r.status, r.frame], [404, "DENY"], other);
+  }
+  assert.equal((await ask("dex.longyu.network", "/", {}, "POST")).status, 405);
+
+  // The bridge's name has the bridge alone.
+  const bridgeHtml: string = loaded.files.get("/bridge.html").raw.toString();
+  for (const path of ["/", "/bridge", "/bridge.html"]) assert.equal((await ask("bridge.longyu.network", path)).body, bridgeHtml, path);
+  assert.equal((await ask("bridge.longyu.network", "/bridge.js")).status, 200);
+  for (const other of ["/swap.html", "/swap", "/launch", "/index.html", "/bridge/"]) assert.equal((await ask("bridge.longyu.network", other)).status, 404, other);
+
+  // Every other name is as it was.
+  assert.equal((await ask("app.longyu.network", "/")).body, built["index.html"]);
+  for (const path of ["/index.html", "/pay.html", "/safe.html", "/swap.html", "/bridge.html", "/launch.html", "/swap.js", "/app.css"]) assert.equal((await ask("app.longyu.network", path)).status, 200, path);
+  for (const path of ["/swap", "/launch", "/bridge"]) assert.equal((await ask("app.longyu.network", path)).status, 404, path);
+});
+
+test("a name of its own may only name pages that are served", () => {
+  const loaded = loadFiles(["swap"], (name: string) => Buffer.from(built[name]!));
+  assert.throws(() => createHandler(loaded, null, null, new Map([["dex.longyu.network", ["launch"]]])), /HOST_PAGES: "dex.longyu.network" names a page that is not served/);
 });

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 // @ts-expect-error a plain JavaScript module without type declarations
-import { landingPage, publishedPage } from "../build.mjs";
+import { landingPage, PROFILES, publishedPage } from "../build.mjs";
 import { getAddress } from "viem";
 import { blockNumberOf, formatCount, nextShown, parseLandingConfig, walletChain } from "./landing-core.ts";
 
@@ -148,6 +148,7 @@ test("landing: the page's own words", () => {
 const developers = readFileSync(new URL("./developers.html", import.meta.url), "utf8");
 const contracts = {
   L2_TOKEN: "0xF4769160D6dc78F66f61F0eA1638E65d43610163", SWAP_ROUTER: "0xed3Eb7fe322424C14cc356Ab182021cAb8dCf01A", SWAP_FACTORY: "0xfE5372cA129113bf12EC70D1EE4A7cBB14f172B0",
+  TOKEN_LAUNCHER: "0x0F6f17ABD46463F2B431104e1895bBE6AA91d7BF",
   L1_STANDARD_BRIDGE: "0xbd5585161c5E9797D2102e775D9C5439aB51279a", L1_PORTAL: "0xB1ba2E8af7137c607987F1c8d89c0f8b0c7D2623", L1_TOKEN: "0x88d5B1946BaB654e31Fbf0bcc3D022e995aB129C",
 };
 
@@ -190,7 +191,9 @@ test("developers: a contract that is not set leaves no row, and one that is not 
   assert.ok(!without.includes("LONGYU Swap router") && without.includes("L2 Standard Bridge") && without.includes("Multicall3"));
   const full: string = landingPage(developers, { ...live, ...contracts }, "developers.html");
   const lines = new Set(without.split("\n"));
-  assert.equal(full.split("\n").filter((line) => !lines.has(line)).length, Object.keys(contracts).length);
+  // One row for each contract, and with TOKEN_LAUNCHER the launch page's links in the menu and the footer.
+  assert.equal(full.split("\n").filter((line) => !lines.has(line)).length, Object.keys(contracts).length + 2);
+  assert.ok(full.includes('<a href="https://testnet.longyu.network/launch.html">Launch</a>') && !without.includes("launch.html"));
   for (const name of Object.keys(contracts)) {
     assert.throws(() => landingPage(developers, { ...live, [name]: "0x1234" }, "developers.html"), new RegExp(`${name} must be a contract address`));
     assert.throws(() => landingPage(developers, { ...live, [name]: `${contracts.L2_TOKEN}"><script>` }, "developers.html"), /must be a contract address/);
@@ -211,4 +214,33 @@ test("developers: the page's own words", () => {
   assert.ok(!developers.includes("\u2014"));
   // A key is never typed into a command: the deploy command signs from Foundry's keystore.
   assert.ok(!/--private-key|PRIVATE_KEY/i.test(developers) && developers.includes("--account deployer"));
+});
+
+test("landing: the official token's address is listed and named in the footer, only when it is set", () => {
+  const LONG = "0xc6D2B2483EC93C15109FCe43d21Ac05919031655";
+  assert.ok(!(landingPage(source, live) as string).includes("Official"));
+  const testnet: string = landingPage(source, { ...live, L2_TOKEN: LONG });
+  assert.ok(testnet.includes(`<dt>Official tLONG</dt><dd><span>${LONG}</span><button type="button" data-copy="${LONG}"`));
+  const mainnet: string = landingPage(source, { ...live, CHAIN_ID: "668800", L2_TOKEN: LONG }, "landing.html", PROFILES.mainnet);
+  assert.ok(mainnet.includes(`<dt>Official LONG</dt><dd><span>${LONG}</span>`));
+  assert.ok(mainnet.includes(`<p class="fine">The only official LONG is ${LONG}. Any other token called LONG or LONGYU was not made by LONGYU.</p>`));
+  assert.ok(!testnet.includes("The only official"));
+  assert.throws(() => landingPage(source, { ...live, L2_TOKEN: "LONG" }), /L2_TOKEN must be a contract address/);
+});
+
+test("landing: the launch page is reached from the cards, the menu and the footer, only when TOKEN_LAUNCHER is set", () => {
+  const LAUNCHER = "0x0F6f17ABD46463F2B431104e1895bBE6AA91d7BF";
+  const without: string = landingPage(source, live);
+  assert.ok(!without.includes("launch.html"));
+  // Five cards without it: the last one spans the row.
+  assert.equal(without.split('<a class="card" ').length - 1, 5);
+  for (const profile of [PROFILES.testnet, PROFILES.mainnet]) {
+    const settings = { ...live, CHAIN_ID: String(profile.l2.id), TOKEN_LAUNCHER: LAUNCHER };
+    const built: string = landingPage(source, settings, "landing.html", profile);
+    assert.equal(built.split('href="https://testnet.longyu.network/launch.html"').length - 1, 3, profile.network);
+    assert.equal(built.split('href="https://testnet.longyu.network/swap.html"').length - 1, 3, profile.network);
+    assert.equal(built.split('<a class="card" ').length - 1, 6, profile.network);
+    assert.ok(built.includes("<p>Launch a fixed-supply token for your project. Gas only.</p>"));
+  }
+  assert.throws(() => landingPage(source, { ...live, TOKEN_LAUNCHER: "0x1234" }), /TOKEN_LAUNCHER must be a contract address/);
 });

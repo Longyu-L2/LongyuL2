@@ -51,6 +51,7 @@
       "symbol": "tLONG"
     },
     "bridgeToken": true,
+    "tradeToken": true,
     "swap": true
   },
   "mainnet": {
@@ -103,6 +104,7 @@
       "symbol": "LONG"
     },
     "bridgeToken": false,
-    "swap": false
+    "tradeToken": false,
+    "swap": true
   }
 }

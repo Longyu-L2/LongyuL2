@@ -38,6 +38,8 @@ import {
   type BridgeConfig,
   type Observed,
   type RawConfig,
+  WITHDRAWAL_STEPS,
+  stepsDone,
 } from "./bridge-core.ts";
 
 const E18 = 10n ** 18n;
@@ -335,10 +337,15 @@ test("links and wallet network parameters", () => {
   assert.equal("blockExplorerUrls" in longyuChainParams({ ...cfg, explorerUrl: null }), false);
 });
 
-const PAGES = ["index.html", "pay.html", "bridge.html", "swap.html", "safe.html"];
+const PAGES = ["index.html", "pay.html", "bridge.html", "swap.html", "launch.html", "safe.html"];
+// The pages with the shared bar: their own images only, until the build adds the ones they show from elsewhere, and no form posts anywhere.
+const SHELL = ["bridge.html", "swap.html", "launch.html"];
 const sourceOf = (page: string) => readFileSync(new URL(`./${page}`, import.meta.url), "utf8");
 const policyOf = (html: string) => /<meta http-equiv="Content-Security-Policy" content="([^"]*)" \/>/.exec(html)?.[1];
-const policy = (connect: string) => `default-src 'self'; connect-src ${connect}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'`;
+const policy = (connect: string, page = "pay.html", images = "'self'") =>
+  SHELL.includes(page)
+    ? `default-src 'self'; connect-src ${connect}; style-src 'self' 'unsafe-inline'; img-src ${images}; base-uri 'none'; object-src 'none'; form-action 'none'`
+    : `default-src 'self'; connect-src ${connect}; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; object-src 'none'`;
 // As the live pages are built; the BSC testnet address carries its key in the path.
 const live = { API_URL: "https://api-testnet.longyu.network", L2_RPC_URL: "https://rpc-testnet.longyu.network", L1_RPC_URL: "https://bsc-testnet.rpc.example/v1/0123456789abcdef" };
 
@@ -346,7 +353,7 @@ test("pages: every page's policy allows no base address and no plugin, and leave
   for (const page of PAGES) {
     const html = sourceOf(page);
     assert.equal(html.match(/Content-Security-Policy/g)?.length, 1, page);
-    assert.equal(policyOf(html), policy("https: http://localhost:*"), page);
+    assert.equal(policyOf(html), policy("https: http://localhost:*", page), page);
     assert.doesNotMatch(html, /<(base|object|embed|applet)\b/i, page);
   }
 });
@@ -355,7 +362,8 @@ test("build: a page may send requests to the addresses it was built with and to 
   assert.equal(BUILD_L1_RPC, DEFAULT_L1_RPC);
   assert.deepEqual(connectSources("pay.html", live), ["https://api-testnet.longyu.network"]);
   assert.deepEqual(connectSources("bridge.html", live), ["https://rpc-testnet.longyu.network", "https://bsc-testnet.rpc.example"]);
-  assert.deepEqual(connectSources("swap.html", live), ["https://rpc-testnet.longyu.network"]);
+  assert.deepEqual(connectSources("swap.html", live), ["https://rpc-testnet.longyu.network", "https://api-testnet.longyu.network"]);
+  assert.deepEqual(connectSources("launch.html", live), ["https://rpc-testnet.longyu.network", "https://api-testnet.longyu.network"]);
   assert.deepEqual(connectSources("safe.html", live), ["https://rpc-testnet.longyu.network", "https://bsc-testnet.rpc.example"]);
   // The claim page reads addresses the build does not know: its policy is left as it is.
   assert.equal(connectSources("index.html", live), null);
@@ -370,7 +378,8 @@ test("build: a page may send requests to the addresses it was built with and to 
   // One address named twice is written once.
   assert.deepEqual(connectSources("bridge.html", { L2_RPC_URL: "https://rpc.example/l2", L1_RPC_URL: "https://rpc.example/l1" }), ["https://rpc.example"]);
   // A page without its RPC address stays closed and may send nothing; one without an API address asks its own.
-  assert.deepEqual(connectSources("swap.html", { ...live, L2_RPC_URL: "" }), ["'none'"]);
+  assert.deepEqual(connectSources("swap.html", { ...live, L2_RPC_URL: "", API_URL: "" }), ["'none'"]);
+  assert.deepEqual(connectSources("swap.html", { ...live, L2_RPC_URL: "" }), ["https://api-testnet.longyu.network"]);
   assert.deepEqual(connectSources("bridge.html", { ...live, L2_RPC_URL: "" }), ["https://bsc-testnet.rpc.example"]);
   assert.deepEqual(connectSources("pay.html", { ...live, API_URL: "" }), ["'self'"]);
   // localhost is allowed only to a page built with a localhost address.
@@ -383,8 +392,15 @@ test("build: a page may send requests to the addresses it was built with and to 
   const connect: Record<string, string> = {
     "pay.html": "https://api-testnet.longyu.network",
     "bridge.html": "https://rpc-testnet.longyu.network https://bsc-testnet.rpc.example",
-    "swap.html": "https://rpc-testnet.longyu.network",
+    "swap.html": "https://rpc-testnet.longyu.network https://api-testnet.longyu.network",
+    "launch.html": "https://rpc-testnet.longyu.network https://api-testnet.longyu.network",
     "safe.html": "https://rpc-testnet.longyu.network https://bsc-testnet.rpc.example",
+  };
+  // Token logos from the API, a chosen logo from the visitor's file, and the icons wallets announce.
+  const images: Record<string, string> = {
+    "bridge.html": "'self' data:",
+    "swap.html": "'self' https://api-testnet.longyu.network data:",
+    "launch.html": "'self' https://api-testnet.longyu.network blob: data:",
   };
   for (const page of PAGES) {
     const html = sourceOf(page);
@@ -393,8 +409,9 @@ test("build: a page may send requests to the addresses it was built with and to 
       assert.equal(out, html, page);
       continue;
     }
-    assert.equal(policyOf(out), policy(connect[page]!), page);
-    assert.equal(out.replace(`connect-src ${connect[page]};`, "connect-src https: http://localhost:*;"), html, page);
+    assert.equal(policyOf(out), policy(connect[page]!, page, images[page]), page);
+    const back = out.replace(`connect-src ${connect[page]};`, "connect-src https: http://localhost:*;");
+    assert.equal(images[page] ? back.replace(`img-src ${images[page]};`, "img-src 'self';") : back, html, page);
     assert.ok(!out.includes("0123456789abcdef"), page);
   }
 });
@@ -427,8 +444,20 @@ test("build: an address that is not an https address stops the build", () => {
   assert.throws(() => publishedPage("pay.html", sourceOf("pay.html"), { ...live, API_URL: "api-testnet.longyu.network" }), /^Error: API_URL/);
   assert.throws(() => publishedPage("safe.html", sourceOf("safe.html"), { ...live, L1_RPC_URL: "http://bsc-testnet.rpc.example" }), /^Error: L1_RPC_URL/);
   // A setting a page does not use is not its concern.
-  assert.equal(policyOf(publishedPage("swap.html", sourceOf("swap.html"), { ...live, API_URL: "x", L1_RPC_URL: "x" })), policy("https://rpc-testnet.longyu.network"));
+  assert.equal(policyOf(publishedPage("swap.html", sourceOf("swap.html"), { ...live, L1_RPC_URL: "x" })), policy("https://rpc-testnet.longyu.network https://api-testnet.longyu.network", "swap.html", "'self' https://api-testnet.longyu.network data:"));
+  assert.throws(() => publishedPage("swap.html", sourceOf("swap.html"), { ...live, API_URL: "x" }), /^Error: API_URL/);
   // A page whose policy the build cannot find is not published with the wide one.
   assert.throws(() => publishedPage("pay.html", sourceOf("pay.html").replace("connect-src", "connect-src "), live), /pay\.html/);
   assert.throws(() => publishedPage("pay.html", sourceOf("pay.html").repeat(2), live), /pay\.html/);
+});
+
+test("withdrawals: the steps done for each status", () => {
+  assert.deepEqual(WITHDRAWAL_STEPS, ["Started", "Proved", "Finalized"]);
+  assert.equal(stepsDone("pending"), 0);
+  assert.equal(stepsDone("waiting-to-prove"), 1);
+  assert.equal(stepsDone("ready-to-prove"), 1);
+  assert.equal(stepsDone("waiting-to-finalize"), 2);
+  assert.equal(stepsDone("ready-to-finalize"), 2);
+  assert.equal(stepsDone("finalized"), 3);
+  for (const off of ["reverted", "not-withdrawal", "error", "loading", "constructor"]) assert.equal(stepsDone(off), null, off);
 });

@@ -126,6 +126,8 @@ export interface ChainGateway {
   rewardTransfers(fromBlock: bigint, toBlock: bigint): Promise<RewardTransfer[]>;
   transactionSucceeded(hash: Hex): Promise<boolean>;
   isContract(address: Address): Promise<boolean>;
+  /** The creator of a token LONGYU Launch made, or null when that launcher did not make it. */
+  launchedTokenCreator(launcher: Address, token: Address): Promise<Address | null>;
 }
 
 /** Serialises transactions from one account so nonces never collide. */
@@ -191,6 +193,12 @@ export interface ViemChainOptions {
 const ZERO = "0x0000000000000000000000000000000000000000";
 const erc20BalanceAbi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256" }] },
+] as const;
+
+/** LONGYU Launch (TokenLauncher) and the tokens it makes: only what the logo upload checks. */
+const tokenLauncherAbi = [
+  { type: "function", name: "launched", stateMutability: "view", inputs: [{ name: "token", type: "address" }], outputs: [{ type: "bool" }] },
+  { type: "function", name: "creator", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
 ] as const;
 
 /** LongMiningToken (mainnet): the vault creates rewards up to the mining pool instead of holding them. */
@@ -434,6 +442,12 @@ export function createViemChain(o: ViemChainOptions): ChainGateway {
     async isContract(address) {
       const code = await pub.getCode({ address });
       return code !== undefined && code !== "0x";
+    },
+
+    async launchedTokenCreator(launcher, token) {
+      const made = await pub.readContract({ address: launcher, abi: tokenLauncherAbi, functionName: "launched", args: [token] });
+      if (!made) return null;
+      return pub.readContract({ address: token, abi: tokenLauncherAbi, functionName: "creator" });
     },
 
     async healthSnapshot() {

@@ -216,6 +216,10 @@ export default defineRailway(() => {
       DISTRIBUTOR_ADDRESS: preserve(),
       FAUCET_ADDRESS: preserve(),
       TURNSTILE_SECRET: preserve(),
+      // "true" turns the human check off everywhere (mainnet since 22 November 2026); unset here, so it stays on.
+      HUMAN_CHECK_OFF: preserve(),
+      // LONGYU Launch (TokenLauncher): its creators may upload their tokens' logos. Unset on the testnet.
+      TOKEN_LAUNCHER: preserve(),
       // The phones' work at the start of a session (modules/phone-work.ts): the output oracle on BSC
       // testnet (chain/testnet/l1-deployments.json), read through L1_RPC_URL. Browsers and the Android
       // app (1.0.4 and later, published 21 November 2026) must do it; earlier APKs must be updated.
@@ -309,6 +313,13 @@ export default defineRailway(() => {
       ORIGIN_SECRET: preserve(),
       TRUST_PROXY: preserve(),
       KNOWN_ADDRESSES: preserve(),
+      X_URL: preserve(),
+      // The official token and the note shown with it and on imitations; tokens made with LONGYU Launch
+      // and their logos from the API. Set on mainnet; unset here.
+      OFFICIAL_TOKENS: preserve(),
+      OFFICIAL_NOTE: preserve(),
+      TOKEN_LAUNCHER: preserve(),
+      TOKEN_LOGO_API: preserve(),
     },
   });
 
@@ -340,6 +351,11 @@ export default defineRailway(() => {
       // The landing page links to each of these that is set; GITHUB_URL once the repository is public.
       GITHUB_URL: preserve(),
       X_URL: preserve(),
+      // The swap and bridge pages' own names, and LONGYU Launch (no launch page on mainnet since
+      // 22 November 2026). Unset here.
+      DEX_URL: preserve(),
+      BRIDGE_URL: preserve(),
+      TOKEN_LAUNCHER: preserve(),
       L1_PORTAL: "0xB1ba2E8af7137c607987F1c8d89c0f8b0c7D2623",
       L1_OUTPUT_ORACLE: "0x2dC53f20F511Bf079167Ef013d6107787E620fE3",
       L1_STANDARD_BRIDGE: "0xbd5585161c5E9797D2102e775D9C5439aB51279a",

@@ -22,6 +22,7 @@ export interface Site {
   mineUrl?: string | null;
   developersUrl?: string | null;
   githubUrl?: string | null;
+  xUrl?: string | null;
   /** Whether the explorer is taking contract verifications. */
   verification?: boolean;
   /** Lower-case address -> label (predeploys, LONGYU contracts, token symbols). */
@@ -59,7 +60,7 @@ const inside = ([href, label]: Link) => html`<a href="${href}">${label}</a>`;
 
 /** The menu on a phone and the footer's columns list the same links. */
 function sections(site: Site): { title: string; links: SafeHtml[] }[] {
-  const network = ([[site.bridgeUrl, "Bridge"], [site.swapUrl, "Swap"], [site.mineUrl, "Mining app"], [site.websiteUrl, "Website"]] as [string | null | undefined, string][])
+  const network = ([[site.bridgeUrl, "Bridge"], [site.swapUrl, "Swap"], [site.mineUrl, "Mining app"], [site.websiteUrl, "Website"], [site.xUrl, "X"]] as [string | null | undefined, string][])
     .filter((l): l is Link => typeof l[0] === "string");
   return [
     { title: "Explorer", links: ([["/blocks", "Blocks"], ["/txs", "Transactions"], ["/tokens", "Tokens"], ["/bridge", "Bridge activity"]] as Link[]).map(inside) },

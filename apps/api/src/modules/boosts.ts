@@ -116,7 +116,7 @@ export function registerBoosts(app: FastifyInstance, deps: Deps): void {
         `INSERT INTO orders (id, order_id, pay_ref, customer, product, description, token, amount, created_by, created_at, expires_at,
                              user_id, boost_plan, boost_bps, boost_days)
          VALUES ($1,$2,$13,$3,'mining_boost',$4,$5,$6::numeric,'app',$7,$8,$9,$10,$11,$12)`,
-        [uuid(), orderId, user.handle, `LONGYU Mining Capacity ${plan.id.split("-")[0]!.toUpperCase()}: ${(1 + plan.boostBps / 10_000).toFixed(2)}× for ${plan.days} days`, token.address, amount.toString(),
+        [uuid(), orderId, user.handle, `LONGYU Mining Capacity ${plan.id.split("-")[0]!.toUpperCase()}: ${(1 + plan.boostBps / 10_000).toFixed(2)}× for ${plan.days} ${plan.days === 1 ? "day" : "days"}`, token.address, amount.toString(),
           now, expiresAt, auth.userId, plan.id, plan.boostBps, plan.days, ref],
       );
       return {

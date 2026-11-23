@@ -9,6 +9,6 @@
   "shortName": "longyu",
   "chainId": 668800,
   "networkId": 668800,
-  "parent": { "type": "L2", "chain": "eip155-56", "bridges": [{ "url": "https://app.longyu.network/bridge.html" }] },
+  "parent": { "type": "L2", "chain": "eip155-56", "bridges": [{ "url": "https://bridge.longyu.network" }] },
   "explorers": [{ "name": "LONGYU Scan", "url": "https://scan.longyu.network", "standard": "EIP3091" }]
 }

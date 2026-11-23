@@ -84,6 +84,7 @@ export function siteOf(config: Config, build = ""): Site {
     mineUrl: config.MINE_URL ?? null,
     developersUrl: config.DEVELOPERS_URL ?? null,
     githubUrl: config.GITHUB_URL ?? null,
+    xUrl: config.X_URL ?? null,
     verification: config.VERIFICATION,
     officialNote: config.OFFICIAL_NOTE.trim() || null,
     official: config.OFFICIAL_TOKENS.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),

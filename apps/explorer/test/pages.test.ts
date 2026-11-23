@@ -534,7 +534,7 @@ test("the home page shows the chain at a glance: figures, a chart of 14 days, th
   const s = await serve(chain, {
     PUBLIC_RPC_URL: "https://rpc.example", SWAP_URL: "https://pages.example/swap.html",
     WEBSITE_URL: "https://www.example", MINE_URL: "https://mine.example", GITHUB_URL: "https://code.example/chain",
-    DEVELOPERS_URL: "https://www.example/developers",
+    X_URL: "https://x.example/chain", DEVELOPERS_URL: "https://www.example/developers",
   });
 
   const home = (await s.get("/")).body;
@@ -561,7 +561,7 @@ test("the home page shows the chain at a glance: figures, a chart of 14 days, th
   for (const link of [
     `<a href="https://pages.example/swap.html" rel="noopener">Swap</a>`, `<a href="https://mine.example" rel="noopener">Mining app</a>`,
     `<a href="https://www.example" rel="noopener">Website</a>`, `<a href="https://code.example/chain" rel="noopener">GitHub</a>`,
-    `<a href="https://www.example/developers" rel="noopener">Developer guide</a>`,
+    `<a href="https://www.example/developers" rel="noopener">Developer guide</a>`, `<a href="https://x.example/chain" rel="noopener">X</a>`,
   ]) assert.equal(count(home, link), 2, link);
 
   // Other pages have the search in the header and their entry in the menu marked.
@@ -576,9 +576,9 @@ test("the home page shows the chain at a glance: figures, a chart of 14 days, th
   // Without those settings there is no wallet button and no link to pages that were not named.
   const bare = await serve(chain);
   const plain = (await bare.get("/")).body;
-  for (const piece of ["add-network", "Mining app", "Website", "GitHub", "Developer guide", ">Swap<"]) assert.ok(!plain.includes(piece), piece);
+  for (const piece of ["add-network", "Mining app", "Website", "GitHub", "Developer guide", ">Swap<", ">X<"]) assert.ok(!plain.includes(piece), piece);
   await bare.close();
-  for (const name of ["WEBSITE_URL", "MINE_URL", "DEVELOPERS_URL", "GITHUB_URL"]) {
+  for (const name of ["WEBSITE_URL", "MINE_URL", "DEVELOPERS_URL", "GITHUB_URL", "X_URL"]) {
     assert.throws(() => ConfigSchema.parse({ RPC_URL: "http://node.invalid", CHAIN_ID: "668801", [name]: "http://plain.example" }), name);
   }
 });

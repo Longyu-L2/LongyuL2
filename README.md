@@ -27,7 +27,6 @@ LONGYU mainnet has been live since 21 November 2026. The public testnet keeps ru
 | Explorer | https://scan.longyu.network |
 | Bridge | https://bridge.longyu.network |
 | Swap | https://dex.longyu.network |
-| Launch a token | https://dex.longyu.network/launch |
 | LONGYU MINE | https://mine.longyu.network |
 | Developers | https://longyu.network/developers |
 

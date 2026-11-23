@@ -9,6 +9,7 @@ import { bsc } from "viem/chains";
 import { paymentRouterAbi } from "@longyu/abis";
 import { explorerTxUrl, parseOrderId, type OrderView } from "./pay-core.ts";
 import { L1_CHAIN } from "./profile.ts";
+import { closedByVisitor, walletSession } from "./wallet-modal.ts";
 
 declare const __API_URL__: string;
 declare global {
@@ -44,15 +45,18 @@ function render(o: OrderView): void {
   if (!o.pay && o.status === "open") $("state").textContent = "Expired: create a new order in the app";
 }
 
+/** The wallet that pays: any wallet works, since the payment is matched to the order by its reference, not by who pays. */
+const session = walletSession();
+
 async function pay(o: OrderView): Promise<void> {
   const p = o.pay!;
-  const eth = window.ethereum;
-  if (!eth) throw new Error("No wallet found. Open this page in your wallet's browser (MetaMask, Trust Wallet or Binance Wallet).");
   // BNB Smart Chain, or the build's own BNB Smart Chain (its testnet on a testnet build).
   const chain = Number(p.chainId) === bsc.id ? bsc : Number(p.chainId) === L1_CHAIN.id ? L1_CHAIN : null;
   if (!chain) throw new Error(`Unsupported payment chain ${p.chainId}.`);
-  const [account] = (await eth.request({ method: "eth_requestAccounts" })) as Address[];
-  if (!account) throw new Error("No account selected in the wallet.");
+  // The wallet dialog: installed wallets, or on a phone without one, links that open this order in a wallet app.
+  const account = await session.connect();
+  const eth = session.provider() as EIP1193Provider | null;
+  if (!eth) throw new Error("No account selected in the wallet.");
   const hexId = `0x${chain.id.toString(16)}` as Hex;
   try {
     await eth.request({ method: "wallet_switchEthereumChain", params: [{ chainId: hexId }] });
@@ -126,7 +130,7 @@ async function main(): Promise<void> {
       if (!order.pay) return;
       await pay(order);
     } catch (e) {
-      setError(e);
+      if (!closedByVisitor(e)) setError(e);
       setStatus("");
     } finally {
       ($("pay") as HTMLButtonElement).disabled = false;

@@ -35,6 +35,8 @@ export const ConfigSchema = z.object({
   MINE_URL: z.string().url().startsWith("https://").optional(),
   DEVELOPERS_URL: z.string().url().startsWith("https://").optional(),
   GITHUB_URL: z.string().url().startsWith("https://").optional(),
+  /** The project's official X account. */
+  X_URL: z.string().url().startsWith("https://").optional(),
   /** Names for LONGYU's own contracts, as address:Label pairs, comma-separated. */
   KNOWN_ADDRESSES: z.string().default(""),
   /** LONGYU Launch (TokenLauncher): tokens it made are marked as plain fixed-supply tokens with no owner. */

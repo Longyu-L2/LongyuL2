@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@longyu/reward-engine": "0.1.0",
-    "viem": "2.58.0",
+    "viem": "2.58.4",
     "zod": "4.6.7"
   },
   "devDependencies": {
